@@ -24,7 +24,6 @@ namespace PokerProject.Controllers
             return Ok(game);
         }
 
-        // Add game points
         [HttpPost("{gameId}/score")]
         public async Task<ActionResult<ScoreDto>> AddScore(int gameId, [FromBody] AddScoreDto dto)
         {
@@ -86,7 +85,6 @@ namespace PokerProject.Controllers
         {
             try
             {
-                //I prefer getting roles this way.
                 var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
 
                 var game = await _gameService.GetGameDetailsAsync(id, role);
@@ -151,7 +149,6 @@ namespace PokerProject.Controllers
             }
         }
 
-        // Controller
         [HttpDelete("points/{scoreId}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> RemoveGamePoints(int scoreId)

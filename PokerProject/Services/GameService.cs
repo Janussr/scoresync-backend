@@ -39,7 +39,6 @@ namespace PokerProject.Services
             _context = context;
         }
 
-        // Start a new game
         public async Task<GameDto> StartGameAsync()
         {
             var game = new Game
@@ -71,7 +70,6 @@ namespace PokerProject.Services
 
 
 
-        // Add points for a player in a game
         public async Task<ScoreDto> AddScoreAsync(int gameId, int userId, int points)
         {
             var game = await _context.Games.FindAsync(gameId);
@@ -165,7 +163,6 @@ namespace PokerProject.Services
             if (game.IsFinished)
                 throw new InvalidOperationException("Game has ended - can't remove points.");
 
-            // Sæt score til 0
             score.Points = 0;
             await _context.SaveChangesAsync();
 
@@ -179,7 +176,6 @@ namespace PokerProject.Services
         }
 
 
-        // End game, calculate winner and update HallOfFame
         public async Task<GameDto> EndGameAsync(int gameId)
         {
             var game = await _context.Games
@@ -195,7 +191,6 @@ namespace PokerProject.Services
             if (!game.Scores.Any())
                 throw new InvalidOperationException("No scores registered");
 
-            // Beregn totals pr spiller
             var totals = game.Scores
                 .GroupBy(s => s.UserId)
                 .Select(g => new
@@ -218,13 +213,11 @@ namespace PokerProject.Services
 
             _context.HallOfFames.Add(hallOfFame);
 
-            // Mark game as finished
             game.IsFinished = true;
             game.EndedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
 
-            // Return DTO (så vi undgår JSON cycle)
             return new GameDto
             {
                 Id = game.Id,
@@ -309,7 +302,6 @@ namespace PokerProject.Services
 
 
 
-        // Get a single game
         public async Task<GameDto?> GetGameByIdAsync(int id)
         {
             var game = await _context.Games
@@ -344,12 +336,11 @@ namespace PokerProject.Services
 
             if (game == null) return null;
 
-            //Admin kan se scoreboard men User kan ikke.
+            //Admin can see scoreboard but normal user cant
             if (!game.IsFinished && role != "Admin")
                 throw new UnauthorizedAccessException();
 
 
-            // Summer points pr spiller
             var scores = game.Scores
                 .GroupBy(s => new { s.UserId, s.User.Name })
                 .Select(g => new GameScoreboardDto
@@ -459,11 +450,6 @@ namespace PokerProject.Services
                 .Include(g => g.Participants)
                 .FirstOrDefaultAsync(g => g.Id == gameId);
 
-            //Cannot be deleted if has score.
-            //var hasScores = await _context.Scores.AnyAsync(s => s.GameId == gameId && s.UserId == userId);
-            //if (hasScores)
-            //    throw new InvalidOperationException("Cannot remove player who already has scores");
-
             if (game == null)
                 throw new KeyNotFoundException("Game not found");
 
@@ -500,9 +486,6 @@ namespace PokerProject.Services
 
             if (game == null)
                 throw new KeyNotFoundException("Game not found");
-
-            //if (game.IsFinished)
-            //    throw new InvalidOperationException("Cannot delete a finished game");
 
             using var transaction = await _context.Database.BeginTransactionAsync();
 
@@ -554,12 +537,12 @@ namespace PokerProject.Services
 
             var bountyValue = game.BountyValue.Value;
 
-            // 1️⃣ Calculate payout first
+            //Calculate payout first
             var points = victim.ActiveBounties > 0
                 ? victim.ActiveBounties * bountyValue
                 : 0;
 
-            // 2️⃣ Register knockout (ALWAYS)
+            //Register knockout (ALWAYS)
             game.Scores.Add(new Score
             {
                 GameId = game.Id,
@@ -569,10 +552,10 @@ namespace PokerProject.Services
                 VictimUserId = victimUserId
             });
 
-            // 3️⃣ Reset victim
+            //Reset victim
             victim.ActiveBounties = 0;
 
-            // 4️⃣ Killer gains bounty
+            //Killer gains bounty
             killer.ActiveBounties += 1;
 
             await _context.SaveChangesAsync();
@@ -636,7 +619,6 @@ namespace PokerProject.Services
 
         public async Task<List<BountyLeaderboardDto>> GetBountyLeaderboardAsync()
         {
-            // Knockouts lavet pr. spiller
             var knockoutsQuery = _context.Scores
                 .Where(s => s.Type == Score.ScoreType.Bounty)
                 .GroupBy(s => s.UserId)
@@ -647,7 +629,6 @@ namespace PokerProject.Services
                     TotalBountyPoints = g.Sum(s => s.Points)
                 });
 
-            // Gange slået ud pr. spiller
             var timesKnockedOutQuery = _context.Scores
                 .Where(s => s.Type == Score.ScoreType.Bounty && s.VictimUserId.HasValue)
                 .GroupBy(s => s.VictimUserId.Value)
@@ -657,11 +638,9 @@ namespace PokerProject.Services
                     TimesKnockedOut = g.Count()
                 });
 
-            // Hent begge aggregater som lists
             var knockouts = await knockoutsQuery.ToListAsync();
             var timesKnockedOut = await timesKnockedOutQuery.ToListAsync();
 
-            // Hent alle brugere der har scores
             var userIds = knockouts.Select(k => k.UserId)
                 .Union(timesKnockedOut.Select(t => t.VictimUserId))
                 .ToList();
@@ -670,7 +649,6 @@ namespace PokerProject.Services
                 .Where(u => userIds.Contains(u.Id))
                 .ToListAsync();
 
-            // Merge data til leaderboard
             var leaderboard = users.Select(u => new BountyLeaderboardDto
             {
                 UserId = u.Id,

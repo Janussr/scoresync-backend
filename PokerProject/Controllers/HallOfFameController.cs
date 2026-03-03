@@ -17,7 +17,6 @@ namespace PokerProject.Controllers
             _hallOfFameService = hallOfFameService;
         }
 
-        //Get entire hall of fame
         [HttpGet]
         public async Task<ActionResult<List<HallOfFameDto>>> GetHallOfFame()
         {

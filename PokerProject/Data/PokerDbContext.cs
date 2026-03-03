@@ -32,7 +32,6 @@ namespace PokerProject.Data
                 .WithMany(u => u.GameParticipants)
                 .HasForeignKey(gp => gp.UserId);
 
-            // Unik game number
             modelBuilder.Entity<Game>()
                 .HasIndex(g => g.GameNumber)
                 .IsUnique();

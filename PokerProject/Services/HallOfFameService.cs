@@ -27,7 +27,7 @@ namespace PokerProject.Services
                     PlayerName = g.Key.Name,
                     Wins = g.Count()
                 })
-                .OrderByDescending(x => x.Wins)   //order by most wins
+                .OrderByDescending(x => x.Wins)   
                 .ToListAsync();
 
             return hallOfFame;
