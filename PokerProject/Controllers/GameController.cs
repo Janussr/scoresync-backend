@@ -235,16 +235,20 @@ namespace PokerProject.Controllers
         {
             var userId = User.GetUserId();
 
-            await _gameService.RegisterKnockoutAsync(gameId, dto.VictimUserId, userId);
+            await _gameService.RegisterKnockoutAsync(
+                gameId,
+                userId,              
+                dto.VictimUserId     
+            );
 
             return Ok();
         }
 
-
+        [Authorize(Roles = "Admin")]
         [HttpPost("{gameId}/admin/bounty")]
-        public async Task<IActionResult> RegisterAdminKnockout(int gameId,[FromBody] KnockoutDto dto)
+        public async Task<IActionResult> AdminRegisterKnockout(int gameId, [FromBody] KnockoutDto dto)
         {
-            await _gameService.AdminRegisterKnockoutAsync(
+            await _gameService.RegisterKnockoutAsync(
                 gameId,
                 dto.KillerUserId,
                 dto.VictimUserId

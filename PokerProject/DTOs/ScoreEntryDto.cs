@@ -9,7 +9,7 @@ namespace PokerProject.DTOs
         public int Points { get; set; }
         public DateTime CreatedAt { get; set; }
         public ScoreType Type { get; set; }
-        public int? KnockedOutUserId { get; set; }
-        public string? KnockedOutUserName { get; set; }
+        public int? VictimUserId { get; set; }
+        public string? VictimUserName { get; set; }
     }
 }

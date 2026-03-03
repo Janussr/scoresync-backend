@@ -23,8 +23,11 @@ namespace PokerProject.Services
         Task<bool> IsUserParticipantAsync(int gameId, int userId);
         Task<List<ParticipantDto>> RemoveParticipantAsync(int gameId, int userId);
         Task<PlayerScoreDetailsDto> GetPlayerScoreEntries(int gameId, int userId);
-        Task RegisterKnockoutAsync(int gameId, int victimUserId, int killerUserId);
-        Task AdminRegisterKnockoutAsync(int gameId, int killerUserId, int victimUserId);
+        //Task RegisterKnockoutAsync(int gameId, int victimUserId, int killerUserId);
+
+        //Task AdminRegisterKnockoutAsync(int gameId, int killerUserId, int victimUserId);
+        Task RegisterKnockoutAsync(int gameId, int killerUserId, int victimUserId);
+        //Task HandleKnockoutAsync(int gameId, int killerUserId, int victimUserId);
         Task<ScoreDto> RegisterRebuyAsync(int gameId, int userId);
         Task UpdateRulesAsync(int gameId, UpdateRulesDto dto);
     }
@@ -386,7 +389,7 @@ namespace PokerProject.Services
 
         public async Task<PlayerScoreDetailsDto> GetPlayerScoreEntries(int gameId, int userId)
         {
-            var scores = await _context.Scores.Include(s => s.KnockedOutUser)
+            var scores = await _context.Scores.Include(s => s.VictimUser)
                 .Where(s => s.GameId == gameId && s.UserId == userId)
                 .OrderBy(s => s.CreatedAt)
                 .Select(s => new ScoreEntryDto
@@ -395,8 +398,8 @@ namespace PokerProject.Services
                     Points = s.Points,
                     CreatedAt = s.CreatedAt,
                     Type = s.Type,
-                    KnockedOutUserId = s.KnockedOutUserId,
-                    KnockedOutUserName = s.KnockedOutUser != null ? s.KnockedOutUser.Name : null
+                    VictimUserId = s.VictimUserId,
+                    VictimUserName = s.VictimUser != null ? s.VictimUser.Name : null
                 })
                 .ToListAsync();
 
@@ -529,90 +532,58 @@ namespace PokerProject.Services
             }
         }
 
-        public async Task RegisterKnockoutAsync(int gameId, int victimUserId, int killerUserId)
+
+        private async Task HandleKnockoutAsync(int gameId, int killerUserId, int victimUserId)
         {
             var game = await _context.Games
                 .Include(g => g.Participants)
                 .Include(g => g.Scores)
-                .FirstOrDefaultAsync(g => g.Id == gameId);
-
-            if (game == null)
-                throw new Exception("Game not found");
-
-            var killer = game.Participants.First(p => p.UserId == killerUserId);
-            var victim = game.Participants.First(p => p.UserId == victimUserId);
-
-            if (killer.UserId == victim.UserId)
-                throw new Exception("You cannot knock yourself out");
-
-            killer.ActiveBounties += 1;
-
-            if (victim.ActiveBounties > 0)
-            {
-                var points = victim.ActiveBounties * game.BountyValue;
-
-                game.Scores.Add(new Score
-                {
-                    GameId = game.Id,
-                    UserId = killerUserId,
-                    Points = (int)points,
-                    Type = Score.ScoreType.Bounty,
-                    KnockedOutUserId = victimUserId
-                });
-            }
-
-            victim.ActiveBounties = 0;
-
-            await _context.SaveChangesAsync();
-        }
-
-        public async Task AdminRegisterKnockoutAsync(int gameId, int killerUserId, int victimUserId)
-        {
-            var game = await _context.Games
-                .Include(g => g.Participants)
-                .Include(g => g.Scores)
-                .FirstOrDefaultAsync(g => g.Id == gameId);
-
-            if (game == null)
-                throw new Exception("Game not found");
-
-            // Find killer og victim
-            var killer = game.Participants.FirstOrDefault(p => p.UserId == killerUserId);
-            var victim = game.Participants.FirstOrDefault(p => p.UserId == victimUserId);
-
-            if (killer == null || victim == null)
-                throw new Exception("Both killer and victim must be participants in this game");
-
-            if (killer.UserId == victim.UserId)
-                throw new Exception("Cannot knock yourself out");
+                .FirstOrDefaultAsync(g => g.Id == gameId)
+                ?? throw new Exception("Game not found");
 
             if (!game.BountyValue.HasValue)
                 throw new Exception("Bounty value not set for this game");
 
+            var killer = game.Participants
+                .FirstOrDefault(p => p.UserId == killerUserId)
+                ?? throw new Exception("Killer not found in game");
+
+            var victim = game.Participants
+                .FirstOrDefault(p => p.UserId == victimUserId)
+                ?? throw new Exception("Victim not found in game");
+
+            if (killer.UserId == victim.UserId)
+                throw new Exception("Cannot knock yourself out");
+
             var bountyValue = game.BountyValue.Value;
 
-            // Killeren får +1 bounty
-            killer.ActiveBounties += 1;
+            // 1️⃣ Calculate payout first
+            var points = victim.ActiveBounties > 0
+                ? victim.ActiveBounties * bountyValue
+                : 0;
 
-            // Hvis offeret har bounties på sig, så tildel point til killeren
-            if (victim.ActiveBounties > 0)
+            // 2️⃣ Register knockout (ALWAYS)
+            game.Scores.Add(new Score
             {
-                var points = victim.ActiveBounties * bountyValue;
+                GameId = game.Id,
+                UserId = killerUserId,
+                Points = points,
+                Type = Score.ScoreType.Bounty,
+                VictimUserId = victimUserId
+            });
 
-                game.Scores.Add(new Score
-                {
-                    GameId = game.Id,
-                    UserId = killer.UserId,
-                    Points = points,
-                    Type = Score.ScoreType.Bounty,
-                    KnockedOutUserId = victim.UserId
-                });
-            }
-
-            // Offer mister sine bounties
+            // 3️⃣ Reset victim
             victim.ActiveBounties = 0;
 
+            // 4️⃣ Killer gains bounty
+            killer.ActiveBounties += 1;
+
             await _context.SaveChangesAsync();
+        }
+
+        public async Task RegisterKnockoutAsync(int gameId, int killerUserId, int victimUserId)
+        {
+            await HandleKnockoutAsync(gameId, killerUserId, victimUserId);
         }
 
 
