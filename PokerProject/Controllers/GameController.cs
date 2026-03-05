@@ -24,6 +24,7 @@ namespace PokerProject.Controllers
             return Ok(game);
         }
 
+        [Authorize(Roles = "Admin, User")]
         [HttpPost("{gameId}/score")]
         public async Task<ActionResult<ScoreDto>> AddScore(int gameId, [FromBody] AddScoreDto dto)
         {
