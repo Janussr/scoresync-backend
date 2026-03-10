@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using PokerProject.DTOs;
 using PokerProject.Services;
 
@@ -20,8 +21,20 @@ namespace PokerProject.Controllers
         [HttpPost("start")]
         public async Task<ActionResult<GameDto>> StartGame()
         {
-            var game = await _gameService.StartGameAsync();
-            return Ok(game);
+            try
+            {
+                var game = await _gameService.StartGameAsync();
+                return Ok(game);
+            }
+            catch (DbUpdateException ex)
+            {
+                return StatusCode(500, "Error trying to create game in db");
+            }
+            catch (Exception ex)
+            {
+                // Alt andet uventet
+                return StatusCode(500, "Unexpected error");
+            }
         }
 
         [Authorize(Roles = "Admin, User")]
@@ -77,15 +90,29 @@ namespace PokerProject.Controllers
         [HttpGet]
         public async Task<ActionResult<List<GameDto>>> GetAllGames()
         {
-            var games = await _gameService.GetAllGamesAsync();
-            return Ok(games);
+            try
+            {
+                var games = await _gameService.GetAllGamesAsync();
+                return Ok(games);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "Unexpected error while fetching games");
+            }
         }
 
         [HttpGet("active/game")]
         public async Task<ActionResult<List<GameDto>>> GetActiveGame()
         {
-            var games = await _gameService.GetActiveGameAsync();
-            return Ok(games);
+            try
+            {
+                var games = await _gameService.GetActiveGameAsync();
+                return Ok(games);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "Unexpected error while fetching active game");
+            }
         }
 
         [HttpGet("{id}")]
@@ -116,14 +143,37 @@ namespace PokerProject.Controllers
         [HttpPost("{gameId}/participants")]
         public async Task<IActionResult> AddParticipants(int gameId, [FromBody] AddParticipantsDto dto)
         {
-            await _gameService.AddParticipantsAsync(gameId, dto.UserIds);
-            return Ok();
+            try
+            {
+                await _gameService.AddParticipantsAsync(gameId, dto.UserIds);
+                return Ok();
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message); 
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "Unexpected error");
+            }
         }
 
         [HttpGet("{gameId}/participants")]
-        public async Task<List<ParticipantDto>> GetParticipants(int gameId)
+        public async Task<ActionResult<List<ParticipantDto>>> GetParticipants(int gameId)
         {
-            return await _gameService.GetParticipantsAsync(gameId);
+            try
+            {
+                var participants = await _gameService.GetParticipantsAsync(gameId);
+                return Ok(participants);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "Unexpected error while fetching participants");
+            }
         }
 
         [HttpDelete("{gameId}/participants/{userId}")]
@@ -220,9 +270,46 @@ namespace PokerProject.Controllers
         [HttpPatch("{gameId}/rules")]
         public async Task<IActionResult> UpdateRules(int gameId, [FromBody] UpdateRulesDto dto)
         {
-            await _gameService.UpdateRulesAsync(gameId, dto);
-            return Ok();
+            try
+            {
+                await _gameService.UpdateRulesAsync(gameId, dto);
+                return Ok();
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message); 
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "Unexpected error");
+            }
         }
+
+        //[Authorize]
+        //[HttpPost("{gameId}/rebuy")]
+        //public async Task<IActionResult> Rebuy(int gameId)
+        //{
+        //    try
+        //    {
+        //        var userId = User.GetUserId();
+        //        var isAdmin = User.GetUserRole() == "Admin";
+        //        var result = await _gameService.RegisterRebuyAsync(gameId, userId, isAdmin);
+        //        return Ok(result);
+        //    }
+        //    catch (UnauthorizedAccessException ex)
+        //    {
+        //        return Forbid(ex.Message); 
+        //    }
+        //    catch (InvalidOperationException ex)
+        //    {
+        //        return BadRequest(ex.Message); 
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return StatusCode(500, ex.Message); 
+        //    }
+
+        //}
 
         [Authorize]
         [HttpPost("{gameId}/rebuy")]
@@ -230,22 +317,60 @@ namespace PokerProject.Controllers
         {
             try
             {
-                //var userId = int.Parse(User.FindFirst("id")!.Value);
                 var userId = User.GetUserId();
-                var result = await _gameService.RegisterRebuyAsync(gameId, userId);
+                var isAdmin = User.GetUserRole() == "Admin";
+
+                var result = await _gameService.RegisterRebuyAsync(
+                    gameId,
+                    userId,
+                    userId,
+                    isAdmin
+                );
+
                 return Ok(result);
             }
             catch (UnauthorizedAccessException ex)
             {
-                return Forbid(ex.Message); 
+                return Forbid(ex.Message);
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(ex.Message); 
+                return BadRequest(ex.Message);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, ex.Message); 
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPost("{gameId}/admin/rebuy")]
+        public async Task<IActionResult> AdminRebuy(int gameId, [FromBody] int targetUserId)
+        {
+            try
+            {
+                var adminId = User.GetUserId();
+
+                var result = await _gameService.RegisterRebuyAsync(
+                    gameId,
+                    adminId,
+                    targetUserId,
+                    true
+                );
+
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Forbid(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
             }
 
         }

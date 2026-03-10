@@ -25,7 +25,8 @@ namespace PokerProject.Services
         Task<List<ParticipantDto>> RemoveParticipantAsync(int gameId, int userId);
         Task<PlayerScoreDetailsDto> GetPlayerScoreEntries(int gameId, int userId);
         Task RegisterKnockoutAsync(int gameId, int killerUserId, int victimUserId, bool isAdmin);
-        Task<ScoreDto> RegisterRebuyAsync(int gameId, int userId);
+        //Task<ScoreDto> RegisterRebuyAsync(int gameId, int userId, bool isAdmin);
+        Task<ScoreDto> RegisterRebuyAsync(int gameId, int actorUserId, int targetUserId, bool isAdmin);
         Task UpdateRulesAsync(int gameId, UpdateRulesDto dto);
         Task<List<BountyLeaderboardDto>> GetBountyLeaderboardAsync();
     }
@@ -75,7 +76,7 @@ namespace PokerProject.Services
         {
             var game = await _context.Games.FindAsync(gameId);
             if (game == null)
-                throw new Exception("Game not found");
+                throw new KeyNotFoundException("Game not found");
 
             if (game.IsFinished)
                 throw new InvalidOperationException("Game has ended – Cant add points.");
@@ -108,7 +109,7 @@ namespace PokerProject.Services
                 .FirstOrDefaultAsync(g => g.Id == dto.GameId);
 
             if (game == null)
-                throw new Exception("Game not found");
+                throw new KeyNotFoundException("Game not found");
 
             if (game.IsFinished)
                 throw new InvalidOperationException("Game has ended - cant add points.");
@@ -155,11 +156,11 @@ namespace PokerProject.Services
         {
             var score = await _context.Scores.FindAsync(scoreId);
             if (score == null)
-                throw new Exception("Score not found");
+                throw new KeyNotFoundException("Score not found");
 
             var game = await _context.Games.FindAsync(score.GameId);
             if (game == null)
-                throw new Exception("Game not found");
+                throw new KeyNotFoundException("Game not found");
 
             if (game.IsFinished)
                 throw new InvalidOperationException("Game has ended - can't remove points.");
@@ -184,10 +185,10 @@ namespace PokerProject.Services
                 .FirstOrDefaultAsync(g => g.Id == gameId);
 
             if (game == null)
-                throw new Exception("Game not found");
+                throw new KeyNotFoundException("Game not found");
 
             if (game.IsFinished)
-                throw new Exception("Game already finished");
+                throw new KeyNotFoundException("Game already finished");
 
             if (!game.Scores.Any())
                 throw new InvalidOperationException("No scores registered");
@@ -450,6 +451,11 @@ namespace PokerProject.Services
 
         public async Task AddParticipantsAsync(int gameId, List<int> userIds)
         {
+
+            var game = await _context.Games.FindAsync(gameId);
+            if (game == null)
+                throw new KeyNotFoundException("Game not found");
+
             foreach (var userId in userIds)
             {
                 var exists = await _context.GameParticipants
@@ -558,9 +564,8 @@ namespace PokerProject.Services
 
         private async Task HandleKnockoutAsync(int gameId, int killerUserId, int victimUserId, bool isAdmin)
         {
-            // Hent spil + bounty value + scores
             var game = await _context.Games
-                .Include(g => g.Scores) // Scores skal vi opdatere
+                .Include(g => g.Scores) 
                 .FirstOrDefaultAsync(g => g.Id == gameId);
 
             if (game == null)
@@ -569,7 +574,6 @@ namespace PokerProject.Services
             if (!game.BountyValue.HasValue)
                 throw new InvalidOperationException("Bounty value not set for this game");
 
-            // Hent kun killer og victim i ét DB-kald
             var participants = await _context.GameParticipants
                 .Where(p => p.GameId == gameId && (p.UserId == killerUserId || p.UserId == victimUserId))
                 .ToListAsync();
@@ -589,13 +593,11 @@ namespace PokerProject.Services
             if (killer.UserId == victim.UserId)
                 throw new InvalidOperationException("Cannot knock yourself out");
 
-            // Beregn bounty points
             var bountyValue = game.BountyValue.Value;
             var points = victim.ActiveBounties > 0
                 ? victim.ActiveBounties * bountyValue
                 : 0;
 
-            // Registrer knockout
             game.Scores.Add(new Score
             {
                 GameId = game.Id,
@@ -606,7 +608,6 @@ namespace PokerProject.Services
                 CreatedAt = DateTime.UtcNow
             });
 
-            // Opdater deltagere
             victim.ActiveBounties = 0;
             killer.ActiveBounties += 1;
 
@@ -619,11 +620,50 @@ namespace PokerProject.Services
         }
 
 
-        public async Task<ScoreDto> RegisterRebuyAsync(int gameId, int userId)
+        //public async Task<ScoreDto> RegisterRebuyAsync(int gameId, int userId, bool isAdmin)
+        //{
+        //    var game = await _context.Games
+        //        .Include(g => g.Participants)
+        //        .Include(g => g.Scores)
+        //        .FirstOrDefaultAsync(g => g.Id == gameId);
+
+        //    if (game == null)
+        //        throw new KeyNotFoundException("Game not found");
+
+        //    if (game.RebuyValue == null)
+        //        throw new InvalidOperationException("Rebuy value not set by admin");
+
+        //    var participant = game.Participants.FirstOrDefault(p => p.UserId == userId);
+        //    if (participant == null)
+        //        if(!isAdmin)
+        //            throw new UnauthorizedAccessException("User not participant in game");
+
+        //    participant.RebuyCount++;
+
+        //    var score = new Score
+        //    {
+        //        GameId = gameId,
+        //        UserId = userId,
+        //        Points = -game.RebuyValue.Value,
+        //        CreatedAt = DateTime.UtcNow,
+        //        Type = Score.ScoreType.Rebuy,
+        //    };
+
+        //    _context.Scores.Add(score);
+        //    await _context.SaveChangesAsync();
+
+        //    return new ScoreDto
+        //    {
+        //        UserId = userId,
+        //        Points = score.Points,
+        //        Type = score.Type
+        //    };
+        //}
+
+        public async Task<ScoreDto> RegisterRebuyAsync(int gameId, int actorUserId, int targetUserId, bool isAdmin)
         {
             var game = await _context.Games
                 .Include(g => g.Participants)
-                .Include(g => g.Scores)
                 .FirstOrDefaultAsync(g => g.Id == gameId);
 
             if (game == null)
@@ -632,16 +672,20 @@ namespace PokerProject.Services
             if (game.RebuyValue == null)
                 throw new InvalidOperationException("Rebuy value not set by admin");
 
-            var participant = game.Participants.FirstOrDefault(p => p.UserId == userId);
+            if (!isAdmin && actorUserId != targetUserId)
+                throw new UnauthorizedAccessException("Players can only rebuy themselves");
+
+            var participant = game.Participants.FirstOrDefault(p => p.UserId == targetUserId);
+
             if (participant == null)
-                throw new UnauthorizedAccessException("User not participant in game");
+                throw new InvalidOperationException("Target user is not participant in game");
 
             participant.RebuyCount++;
 
             var score = new Score
             {
                 GameId = gameId,
-                UserId = userId,
+                UserId = targetUserId,
                 Points = -game.RebuyValue.Value,
                 CreatedAt = DateTime.UtcNow,
                 Type = Score.ScoreType.Rebuy,
@@ -652,7 +696,7 @@ namespace PokerProject.Services
 
             return new ScoreDto
             {
-                UserId = userId,
+                UserId = targetUserId,
                 Points = score.Points,
                 Type = score.Type
             };
@@ -661,7 +705,8 @@ namespace PokerProject.Services
         public async Task UpdateRulesAsync(int gameId, UpdateRulesDto dto)
         {
             var game = await _context.Games.FindAsync(gameId);
-            if (game == null) throw new KeyNotFoundException("Game not found");
+            if (game == null) 
+                throw new KeyNotFoundException("Game not found");
 
             game.RebuyValue = dto.RebuyValue;
             game.BountyValue = dto.BountyValue;
