@@ -7,7 +7,7 @@ The purpose is to track poker scores, determine winners, and keep a history of g
 - .NET 10  
 - MSSQL  
 - Entity Framework (Code First)
--Xunit v3 for testing
+- Xunit v3 for testing
 
 ## Pipeline
 CI - github actions, run tests before pushing the code.
