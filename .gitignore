@@ -3,6 +3,9 @@ appsettings.json
 appsettings.Development.json
 appsettings.Production.json
 
+# Ignore env files with secrets
+.env
+
 # Ignore bin/ og obj/ mapper
 bin/
 obj/

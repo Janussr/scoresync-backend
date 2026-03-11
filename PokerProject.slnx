@@ -1,4 +1,8 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="docker-compose.yml" />
+    <File Path="Dockerfile" />
+  </Folder>
   <Project Path="PokerProject.Tests/PokerProject.Tests.csproj" Id="60ef1724-e24d-4ce1-b2aa-0c5b102d9951" />
   <Project Path="PokerProject/PokerProject.csproj" />
 </Solution>
