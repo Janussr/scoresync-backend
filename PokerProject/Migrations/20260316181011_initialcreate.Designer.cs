@@ -12,7 +12,7 @@ using PokerProject.Data;
 namespace PokerProject.Migrations
 {
     [DbContext(typeof(PokerDbContext))]
-    [Migration("20260304173145_initialcreate")]
+    [Migration("20260316181011_initialcreate")]
     partial class initialcreate
     {
         /// <inheritdoc />
@@ -168,8 +168,9 @@ namespace PokerProject.Migrations
                     b.Property<int>("Points")
                         .HasColumnType("int");
 
-                    b.Property<int>("Type")
-                        .HasColumnType("int");
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("UserId")
                         .HasColumnType("int");

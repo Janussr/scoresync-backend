@@ -18,10 +18,8 @@ namespace PokerProject.Services.Users
         {
             _context = context;
 
-            // Prøv at hente fra env var
             _jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET")!;
 
-            // Hvis den ikke findes, kan du fallback til appsettings (valgfrit)
             if (string.IsNullOrEmpty(_jwtKey))
             {
                 _jwtKey = configuration["JwtSettings:Secret"]!;
@@ -69,7 +67,7 @@ namespace PokerProject.Services.Users
                 Username = dto.Username,
                 Name = dto.Name,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-                Role = "User"
+                Role = dto.Role
             };
 
             _context.Users.Add(user);
@@ -100,6 +98,23 @@ namespace PokerProject.Services.Users
             };
         }
 
+        public async Task<UserDto?> SetUserRoleAsync(SetUserRoleDto dto)
+        {
+            var user = await _context.Users.FindAsync(dto.UserId);
+            if (user == null) return null;
+
+            user.Role = dto.Role;
+
+            await _context.SaveChangesAsync();
+
+            return new UserDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                Name = user.Name
+            };
+        }
+
         public async Task<string?> LoginAndGenerateTokenAsync(string username, string password)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == username);
@@ -116,17 +131,17 @@ namespace PokerProject.Services.Users
         var tokenHandler = new JwtSecurityTokenHandler();
         var key = Encoding.ASCII.GetBytes(_jwtKey);
 
-        var tokenDescriptor = new SecurityTokenDescriptor
-        {
-            Subject = new ClaimsIdentity(new[]
+            var tokenDescriptor = new SecurityTokenDescriptor
             {
+                Subject = new ClaimsIdentity(new[]
+                {
                 new Claim("id", user.Id.ToString()),
                 new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Role, user.Role)
+                new Claim(ClaimTypes.Role, user.Role.ToString())
             }),
-            Expires = DateTime.UtcNow.AddDays(1),
-            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
-        };
+                Expires = DateTime.UtcNow.AddDays(1),
+                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+            };
 
         var token = tokenHandler.CreateToken(tokenDescriptor);
         return tokenHandler.WriteToken(token);

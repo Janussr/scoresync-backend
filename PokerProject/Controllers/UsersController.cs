@@ -79,7 +79,7 @@ public class UsersController : ControllerBase
         }
     }
 
-    //[Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin")]
     [HttpPost("admin/reset-password")]
     public async Task<IActionResult> AdminResetPassword(AdminResetPasswordDto dto)
     {
@@ -96,5 +96,21 @@ public class UsersController : ControllerBase
         {
             return StatusCode(500, new { message = "Unexpected server error" });
         }
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPost("admin/set-role")]
+    public async Task<IActionResult> SetRole(SetUserRoleDto dto)
+    {
+        var user = await _userService.SetUserRoleAsync(dto);
+
+        if (user == null)
+            return NotFound(new { message = "User not found" });
+
+        return Ok(new
+        {
+            message = $"User role updated to {dto.Role}",
+            user
+        });
     }
 }

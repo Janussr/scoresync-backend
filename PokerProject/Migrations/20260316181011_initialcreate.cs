@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace PokerProject.Migrations
 {
     /// <inheritdoc />
-    public partial class initial : Migration
+    public partial class initialcreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -112,7 +112,8 @@ namespace PokerProject.Migrations
                     UserId = table.Column<int>(type: "int", nullable: false),
                     Points = table.Column<int>(type: "int", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    Type = table.Column<int>(type: "int", nullable: false)
+                    VictimUserId = table.Column<int>(type: "int", nullable: true),
+                    Type = table.Column<string>(type: "nvarchar(max)", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -129,6 +130,11 @@ namespace PokerProject.Migrations
                         principalTable: "Users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_Scores_Users_VictimUserId",
+                        column: x => x.VictimUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateIndex(
@@ -168,6 +174,11 @@ namespace PokerProject.Migrations
                 name: "IX_Scores_UserId",
                 table: "Scores",
                 column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Scores_VictimUserId",
+                table: "Scores",
+                column: "VictimUserId");
         }
 
         /// <inheritdoc />

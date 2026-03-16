@@ -16,7 +16,6 @@ namespace PokerProject.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            base.OnModelCreating(modelBuilder);
 
             modelBuilder.Entity<GameParticipant>()
         .HasIndex(gp => new { gp.GameId, gp.UserId })
@@ -63,6 +62,18 @@ namespace PokerProject.Data
                 .WithOne(h => h.Game)
                 .HasForeignKey<HallOfFame>(h => h.GameId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            //Convert role enum to string for better readability in the database
+            modelBuilder.Entity<User>()
+           .Property(u => u.Role)
+           .HasConversion<string>();
+
+            //Convert score type enum to string for better readability in the database
+            modelBuilder.Entity<Score>()
+       .Property(s => s.Type)
+       .HasConversion<string>();
+
+            base.OnModelCreating(modelBuilder);
         }
     }
 }
