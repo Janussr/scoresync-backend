@@ -243,8 +243,8 @@ namespace PokerProject.Services.Games
 
             if (game == null) return null;
 
-            //Admin can see scoreboard but normal user cant
-            if (!game.IsFinished && role != "Admin")
+            //Admin and gamemaster can see active scoreboard but user cannot
+            if (!game.IsFinished && role != "Admin" && role != "Gamemaster")
                 throw new UnauthorizedAccessException();
 
 

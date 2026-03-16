@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using PokerProject.DTOs;
 using PokerProject.Models;
 using PokerProject.Services.Users;
+using System.Data;
 
 [ApiController]
 [Route("api/[controller]")]

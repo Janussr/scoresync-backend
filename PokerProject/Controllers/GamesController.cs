@@ -17,7 +17,7 @@ namespace PokerProject.Controllers
             _gameService = gameService;
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin, Gamemaster")]
         [HttpPost("start")]
         public async Task<ActionResult<GameDto>> StartGame()
         {
@@ -36,7 +36,7 @@ namespace PokerProject.Controllers
             }
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin, Gamemaster")]
         [HttpPost("{gameId}/end")]
         public async Task<ActionResult<GameDto>> EndGame(int gameId)
         {
@@ -52,7 +52,7 @@ namespace PokerProject.Controllers
 
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin, Gamemaster")]
         [HttpPost("{gameId}/cancel")]
         public async Task<ActionResult<GameDto>> CancelGame(int gameId)
         {
@@ -123,8 +123,8 @@ namespace PokerProject.Controllers
             }
         }
 
-        [HttpDelete("remove/{gameId}")]
         [Authorize(Roles = "Admin")]
+        [HttpDelete("remove/{gameId}")]
         public async Task<IActionResult> RemoveGame(int gameId)
         {
             try
@@ -143,7 +143,7 @@ namespace PokerProject.Controllers
         }
 
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin, Gamemaster")]
         [HttpPatch("{gameId}/rules")]
         public async Task<IActionResult> UpdateRules(int gameId, [FromBody] UpdateRulesDto dto)
         {

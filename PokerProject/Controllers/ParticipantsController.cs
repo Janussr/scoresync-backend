@@ -16,7 +16,7 @@ namespace PokerProject.Controllers
             _participantService = participantService;
         }
 
-        [Authorize(Roles = "Admin, User")]
+        [Authorize(Roles = "Admin, User, Gamemaster")]
         [HttpPost("{gameId}")]
         public async Task<IActionResult> AddParticipants(int gameId, [FromBody] AddParticipantsDto dto)
         {
@@ -54,10 +54,9 @@ namespace PokerProject.Controllers
         }
 
         [HttpDelete("{gameId}/participants/{userId}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin, Gamemaster")]
         public async Task<IActionResult> RemoveParticipant(int gameId, int userId)
         {
-
             try
             {
                 var updatedParticipants = await _participantService.RemoveParticipantAsync(gameId, userId);

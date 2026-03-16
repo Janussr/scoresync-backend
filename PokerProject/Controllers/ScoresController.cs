@@ -17,7 +17,7 @@ namespace PokerProject.Controllers
         }
 
 
-        [Authorize(Roles = "Admin, User")]
+        [Authorize(Roles = "Admin, User, Gamemaster")]
         [HttpPost("{gameId}/score")]
         public async Task<ActionResult<ScoreDto>> AddScore(int gameId, [FromBody] AddScoreDto dto)
         {
@@ -47,7 +47,7 @@ namespace PokerProject.Controllers
         }
 
         [HttpDelete("points/{scoreId}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin, Gamemaster")]
         public async Task<IActionResult> RemoveGamePoints(int scoreId)
         {
             try
@@ -65,6 +65,7 @@ namespace PokerProject.Controllers
             }
         }
 
+        [Authorize(Roles = "Admin, Gamemaster")]
         [HttpPost("{gameId}/points/bulk")]
         public async Task<IActionResult> AddScoresBulk(int gameId, [FromBody] BulkAddScoresDto dto)
         {
@@ -120,7 +121,7 @@ namespace PokerProject.Controllers
             }
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin, Gamemaster")]
         [HttpPost("{gameId}/admin/rebuy")]
         public async Task<IActionResult> AdminRebuy(int gameId, [FromBody] int targetUserId)
         {

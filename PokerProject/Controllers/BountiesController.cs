@@ -47,7 +47,7 @@ namespace PokerProject.Controllers
             }
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin, , Gamemaster")]
         [HttpPost("{gameId}/admin/bounty")]
         public async Task<IActionResult> AdminRegisterKnockout(int gameId, [FromBody] KnockoutDto dto)
         {
