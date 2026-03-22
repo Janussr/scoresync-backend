@@ -7,7 +7,7 @@ public static class ClaimsPrincipalExtensions
         if (user == null)
             throw new ArgumentNullException(nameof(user));
 
-        var claim = user.Claims.FirstOrDefault(c => c.Type == "id");
+        var claim = user.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
         if (claim == null)
             throw new Exception("User ID claim not found");
 

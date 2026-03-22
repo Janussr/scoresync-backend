@@ -1,9 +1,12 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PokerProject.DTOs;
 using PokerProject.Models;
 using PokerProject.Services.Users;
 using System.Data;
+using System.Security.Claims;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -24,13 +27,13 @@ public class UsersController : ControllerBase
             var user = await _userService.RegisterAsync(dto);
             return CreatedAtAction(nameof(GetUserById), new { id = user.Id }, user);
         }
-        catch (ArgumentException ex) // fx username already exists
+        catch (ArgumentException ex) 
         {
             return BadRequest(new { message = ex.Message });
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { message = "Unexpected server error" });
+            return StatusCode(500, new { message = ex });
         }
     }
 
@@ -45,7 +48,7 @@ public class UsersController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { message = "Unexpected server error" });
+            return StatusCode(500, new { message = ex });
         }
     }
 
@@ -59,25 +62,62 @@ public class UsersController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { message = "Unexpected server error" });
+            return StatusCode(500, new { message = ex });
         }
     }
 
     [HttpPost("login")]
-    public async Task<ActionResult<object>> Login(LoginUserDto dto)
+    public async Task<IActionResult> Login(LoginUserDto dto)
     {
-        try
-        {
-            var token = await _userService.LoginAndGenerateTokenAsync(dto.Username, dto.Password);
-            if (token == null)
-                return Unauthorized(new { message = "Invalid username or password" });
+        var user = await _userService.ValidateUserAsync(dto.Username, dto.Password);
+        if (user == null)
+            return Unauthorized(new { message = "Invalid username or password" });
 
-            return Ok(new { token });
-        }
-        catch (Exception ex)
+        var claims = new List<Claim>
+    {
+        new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+        new Claim(ClaimTypes.Name, user.Username),
+        new Claim(ClaimTypes.Role, user.Role.ToString())
+    };
+
+        var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        var authProperties = new AuthenticationProperties
         {
-            return StatusCode(500, new { message = "Unexpected server error" });
-        }
+            IsPersistent = true, // husk login mellem sessions TODO true or false?
+            ExpiresUtc = DateTimeOffset.UtcNow.AddDays(1)
+        };
+
+        await HttpContext.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            new ClaimsPrincipal(claimsIdentity),
+            authProperties
+        );
+
+        return Ok(new { message = "Logged in" });
+    }
+
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout()
+    {
+        Response.Cookies.Delete("PokerAuth"); 
+        return Ok(new { message = "Logged out" });
+    }
+
+    // api/users/me
+    [Authorize]
+    [HttpGet("me")]
+    public async Task<ActionResult<UserDto>> Me()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userIdClaim == null) return Unauthorized();
+
+        if (!int.TryParse(userIdClaim, out var userId))
+            return Unauthorized();
+
+        var user = await _userService.GetUserByIdAsync(int.Parse(userIdClaim));
+        if (user == null) return NotFound();
+
+        return Ok(user);
     }
 
     [Authorize(Roles = "Admin")]
@@ -95,7 +135,7 @@ public class UsersController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { message = "Unexpected server error" });
+            return StatusCode(500, new { message = ex });
         }
     }
 

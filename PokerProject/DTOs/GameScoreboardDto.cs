@@ -2,7 +2,8 @@
 {
     public class GameScoreboardDto
     {
-        public int UserId { get; set; }
+
+        public int PlayerId { get; set; }
         public string UserName { get; set; } = null!;
         public int TotalPoints { get; set; }
 

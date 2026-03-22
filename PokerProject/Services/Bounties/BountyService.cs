@@ -16,7 +16,9 @@ namespace PokerProject.Services.Bounties
         private async Task HandleKnockoutAsync(int gameId, int killerUserId, int victimUserId, bool isAdmin)
         {
             var game = await _context.Games
-                .Include(g => g.Scores)
+                .Include(g => g.Rounds)
+                    .ThenInclude(r => r.Scores)
+                .Include(g => g.Players)
                 .FirstOrDefaultAsync(g => g.Id == gameId);
 
             if (game == null)
@@ -25,21 +27,23 @@ namespace PokerProject.Services.Bounties
             if (!game.BountyValue.HasValue)
                 throw new InvalidOperationException("Bounty value not set for this game");
 
-            var participants = await _context.GameParticipants
-                .Where(p => p.GameId == gameId && (p.UserId == killerUserId || p.UserId == victimUserId))
-                .ToListAsync();
+            // Find aktiv runde
+            var currentRound = game.Rounds.FirstOrDefault(r => r.EndedAt == null);
+            if (currentRound == null)
+                throw new InvalidOperationException("No active round found. Start a round before registering bounties.");
 
-            if (participants.Count != 2)
-            {
-                if (!participants.Any(p => p.UserId == killerUserId))
-                    throw new InvalidOperationException("Killer not found in game");
+            var players = game.Players
+                .Where(p => p.UserId == killerUserId || p.UserId == victimUserId)
+                .ToList();
 
-                if (!participants.Any(p => p.UserId == victimUserId))
-                    throw new InvalidOperationException("Victim not found in game");
-            }
+            if (!players.Any(p => p.UserId == killerUserId))
+                throw new InvalidOperationException("Killer not found in game");
 
-            var killer = participants.First(p => p.UserId == killerUserId);
-            var victim = participants.First(p => p.UserId == victimUserId);
+            if (!players.Any(p => p.UserId == victimUserId))
+                throw new InvalidOperationException("Victim not found in game");
+
+            var killer = players.First(p => p.UserId == killerUserId);
+            var victim = players.First(p => p.UserId == victimUserId);
 
             if (killer.UserId == victim.UserId)
                 throw new InvalidOperationException("Cannot knock yourself out");
@@ -49,15 +53,17 @@ namespace PokerProject.Services.Bounties
                 ? victim.ActiveBounties * bountyValue
                 : 0;
 
-            game.Scores.Add(new Score
+            var score = new Score
             {
-                GameId = game.Id,
-                UserId = killerUserId,
-                Points = points,
+                RoundId = currentRound.Id,
+                PlayerId = killerUserId,
+                Value = points,
                 Type = Score.ScoreType.Bounty,
-                VictimUserId = victimUserId,
+                VictimPlayerId = victimUserId,
                 CreatedAt = DateTime.UtcNow
-            });
+            };
+
+            currentRound.Scores.Add(score);
 
             victim.ActiveBounties = 0;
             killer.ActiveBounties += 1;
@@ -75,17 +81,17 @@ namespace PokerProject.Services.Bounties
         {
             var knockoutsQuery = _context.Scores
                 .Where(s => s.Type == Score.ScoreType.Bounty)
-                .GroupBy(s => s.UserId)
+                .GroupBy(s => s.PlayerId)
                 .Select(g => new
                 {
                     UserId = g.Key,
                     Knockouts = g.Count(),
-                    TotalBountyPoints = g.Sum(s => s.Points)
+                    TotalBountyPoints = g.Sum(s => s.Value)
                 });
 
             var timesKnockedOutQuery = _context.Scores
-                .Where(s => s.Type == Score.ScoreType.Bounty && s.VictimUserId.HasValue)
-                .GroupBy(s => s.VictimUserId.Value)
+                .Where(s => s.Type == Score.ScoreType.Bounty && s.VictimPlayerId.HasValue)
+                .GroupBy(s => s.VictimPlayerId.Value)
                 .Select(g => new
                 {
                     VictimUserId = g.Key,

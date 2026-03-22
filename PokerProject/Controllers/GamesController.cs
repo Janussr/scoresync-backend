@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PokerProject.DTOs;
 using PokerProject.Services.Games;
+using System.Security.Claims;
 
 namespace PokerProject.Controllers
 {
@@ -23,16 +24,12 @@ namespace PokerProject.Controllers
         {
             try
             {
-                var game = await _gameService.StartGameAsync();
-                return Ok(game);
-            }
-            catch (DbUpdateException ex)
-            {
-                return StatusCode(500, "Error trying to create game in db");
+                var gameDto = await _gameService.StartGameAsync(User);
+                return Ok(gameDto);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "Unexpected error");
+                return StatusCode(500, new { message = ex.Message });
             }
         }
 
@@ -45,11 +42,14 @@ namespace PokerProject.Controllers
                 var ended = await _gameService.EndGameAsync(gameId);
                 return Ok(ended);
             }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
             catch (InvalidOperationException ex)
             {
                 return BadRequest(new { message = ex.Message });
             }
-
         }
 
         [Authorize(Roles = "Admin, Gamemaster")]
@@ -81,30 +81,67 @@ namespace PokerProject.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "Unexpected error while fetching games");
+                return StatusCode(500, ex);
             }
         }
 
-        [HttpGet("active/game")]
-        public async Task<ActionResult<List<GameDto>>> GetActiveGame()
+        //[HttpGet("active")]
+        //public async Task<ActionResult<List<GameDto>>> GetActiveGames()
+        //{
+        //    try
+        //    {
+        //        var games = await _gameService.GetActiveGamesAsync();
+        //        return Ok(games);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return StatusCode(500, new { message = ex.Message });
+        //    }
+        //}
+
+        [HttpGet("player-page/active")]
+        public async Task<ActionResult<GameDto>> GetActiveGameForPlayer()
         {
             try
             {
-                var games = await _gameService.GetActiveGameAsync();
+                var userId = User.GetUserId();
+
+                var game = await _gameService.GetActiveGameForPlayerAsync(userId);
+                if (game == null) return NotFound();
+                return Ok(game);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
+        [Authorize(Roles = "Admin, Gamemaster")]
+        [HttpGet("game-panel/active")]
+        public async Task<ActionResult<List<GamePanelDto>>> GetActiveGameForGamePanel()
+        {
+            try
+            {
+                int userId = User.GetUserId();
+                var games = await _gameService.GetActiveGameForGamePanelAsync(userId);
                 return Ok(games);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "Unexpected error while fetching active game");
+                return StatusCode(500, new { message = ex.Message });
             }
         }
+
+
+        
+
 
         [HttpGet("{id}")]
         public async Task<ActionResult<GameDetailsDto>> GetGameDetails(int id)
         {
             try
             {
-                var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+                var role = User.GetUserRole();
 
                 var game = await _gameService.GetGameDetailsAsync(id, role);
 
@@ -113,7 +150,7 @@ namespace PokerProject.Controllers
 
                 return Ok(game);
             }
-            catch (UnauthorizedAccessException ex)
+            catch (UnauthorizedAccessException)
             {
                 return Forbid();
             }
@@ -158,7 +195,79 @@ namespace PokerProject.Controllers
             }
             catch (Exception ex)
             {
+                return StatusCode(500, ex);
+            }
+        }
+
+        //user joins game manually via lobby
+        [Authorize]
+        [HttpPost("{gameId}/join")]
+        public async Task<IActionResult> JoinGameAsPlayer(int gameId)
+        {
+            try
+            {
+                var currentUserId = User.GetUserId(); 
+                var player = await _gameService.JoinGameAsPlayerAsync(gameId, currentUserId);
+
+                return Ok(new { message = "Joined game", player });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
+        [Authorize]
+        [HttpPost("{gameId}/leave")]
+        public async Task<IActionResult> LeaveGame(int gameId, [FromBody] GameActionDto? dto = null)
+        {
+            try
+            {
+                var currentUserId = User.GetUserId();
+                var role = User.GetUserRole();
+
+                var userIdToLeave = (role == "Admin" || role == "Gamemaster") && dto != null
+                    ? dto.TargetUserId
+                    : currentUserId;
+
+                await _gameService.LeaveGameAsync(gameId, userIdToLeave);
+
+                return Ok(new { message = "Player left the game", GameId = gameId, UserId = userIdToLeave });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
                 return StatusCode(500, "Unexpected error");
+            }
+        }
+
+
+        [HttpGet("lobby")]
+        public async Task<ActionResult<List<GameListDto>>> GetActiveGamesLobby()
+        {
+            try
+            {
+                var games = await _gameService.GetActiveGamesLobbyListAsync();
+                return Ok(games);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
             }
         }
     }

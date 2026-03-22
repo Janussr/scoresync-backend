@@ -3,8 +3,8 @@
     public class GameHistoryDto
     {
         public DateTime PlayedAt { get; set; }
-        public string Winner { get; set; }
+        public required string Winner { get; set; }
         public int WinnerScore { get; set; }
-        public List<ScoreDto> Scores { get; set; }
+        public required List<ScoreDto> Scores { get; set; }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using PokerProject.DTOs;
+using PokerProject.Models;
 
 namespace PokerProject.Services.Users
 {
@@ -7,8 +8,9 @@ namespace PokerProject.Services.Users
         Task<IEnumerable<UserDto>> GetAllUsersAsync();
         Task<UserDto?> GetUserByIdAsync(int id);
         Task<UserDto> RegisterAsync(RegisterUserDto dto);
-        Task<string?> LoginAndGenerateTokenAsync(string username, string password);
+        Task<User?> ValidateUserAsync(string username, string password);
         Task<UserDto?> AdminResetPasswordAsync(int userId, string newPassword);
         Task<UserDto?> SetUserRoleAsync(SetUserRoleDto dto);
+        //Task<string?> LoginAndGenerateTokenAsync(string username, string password);
     }
 }

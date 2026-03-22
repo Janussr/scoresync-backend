@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using PokerProject.Data;
 using PokerProject.DTOs;
+using PokerProject.Models;
 
 namespace PokerProject.Services.Scores
 {
@@ -12,6 +13,17 @@ namespace PokerProject.Services.Scores
             _context = context;
         }
 
+        private async Task<Round> GetActiveRound(int gameId)
+        {
+            var round = await _context.Rounds
+                .FirstOrDefaultAsync(r => r.GameId == gameId && r.EndedAt == null);
+
+            if (round == null)
+                throw new InvalidOperationException("No active round");
+
+            return round;
+        }
+
         public async Task<ScoreDto> AddScoreAsync(int gameId, int userId, int points)
         {
             var game = await _context.Games.FindAsync(gameId);
@@ -19,13 +31,24 @@ namespace PokerProject.Services.Scores
                 throw new KeyNotFoundException("Game not found");
 
             if (game.IsFinished)
-                throw new InvalidOperationException("Game has ended – Cant add points.");
+                throw new InvalidOperationException("Game has ended – can't add points.");
+
+            var round = await GetActiveRound(gameId);
+            if (round == null)
+                throw new InvalidOperationException("No active round found for this game.");
+
+            var player = await _context.Players
+                .Include(p => p.User) 
+                .FirstOrDefaultAsync(p => p.GameId == gameId && p.UserId == userId);
+
+            if (player == null)
+                throw new InvalidOperationException("Player not found in this game.");
 
             var score = new Score
             {
-                GameId = gameId,
-                UserId = userId,
-                Points = points,
+                RoundId = round.Id,
+                PlayerId = player.Id,      
+                Value = points,
                 CreatedAt = DateTime.UtcNow,
                 Type = Score.ScoreType.Chips,
             };
@@ -35,76 +58,106 @@ namespace PokerProject.Services.Scores
 
             return new ScoreDto
             {
-                UserId = score.UserId,
-                Points = score.Points,
-                GameId = score.GameId,
+                PlayerId = player.Id,         
+                UserId = player.UserId,
+                Points = score.Value,
                 Type = score.Type,
+                Rounds = new RoundDto
+                {
+                    Id = round.Id,
+                    RoundNumber = round.RoundNumber,
+                    StartedAt = round.StartedAt
+                }
             };
         }
 
         public async Task<List<ScoreDto>> AddScoresBulkAsync(BulkAddScoresDto dto)
         {
-            var game = await _context.Games
-                .Include(g => g.Scores)
-                .FirstOrDefaultAsync(g => g.Id == dto.GameId);
-
+            var game = await _context.Games.FindAsync(dto.GameId);
             if (game == null)
                 throw new KeyNotFoundException("Game not found");
 
             if (game.IsFinished)
-                throw new InvalidOperationException("Game has ended - cant add points.");
+                throw new InvalidOperationException("Game has ended – can't add points.");
 
-            var addedScores = new List<Score>();
+            var round = await GetActiveRound(dto.GameId);
+            if (round == null)
+                throw new InvalidOperationException("No active round found for this game.");
 
             using var transaction = await _context.Database.BeginTransactionAsync();
-
             try
             {
+                var userIds = dto.Scores.Select(s => s.UserId).ToList();
+                var players = await _context.Players
+                    .Where(p => p.GameId == game.Id && userIds.Contains(p.UserId))
+                    .ToListAsync();
+
+                var missingUsers = userIds.Except(players.Select(p => p.UserId)).ToList();
+                if (missingUsers.Any())
+                    throw new InvalidOperationException($"Users {string.Join(", ", missingUsers)} are not players in this game.");
+
+                var addedScores = new List<Score>();
+
                 foreach (var s in dto.Scores)
                 {
+                    var player = players.First(p => p.UserId == s.UserId);
+
                     var score = new Score
                     {
-                        GameId = game.Id,
-                        UserId = s.UserId,
-                        Points = s.Points,
+                        RoundId = round.Id,
+                        PlayerId = player.Id,
+                        Value = s.Points,
                         CreatedAt = DateTime.UtcNow,
                         Type = Score.ScoreType.Chips,
                     };
+
                     _context.Scores.Add(score);
                     addedScores.Add(score);
                 }
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
+
+                return addedScores.Select(s =>
+                {
+                    var player = players.First(p => p.Id == s.PlayerId);
+                    return new ScoreDto
+                    {
+                        Id = s.Id,
+                        PlayerId = player.UserId,
+                        Points = s.Value,
+                        Type = s.Type,
+                        Rounds = new RoundDto
+                        {
+                            Id = round.Id,
+                            RoundNumber = round.RoundNumber,
+                            StartedAt = round.StartedAt
+                        }
+                    };
+                }).ToList();
             }
             catch
             {
                 await transaction.RollbackAsync();
                 throw;
             }
-
-            return addedScores.Select(s => new ScoreDto
-            {
-                Id = s.Id,
-                UserId = s.UserId,
-                Points = s.Points,
-                Type = s.Type
-            }).ToList();
         }
 
         public async Task<PlayerScoreDetailsDto> GetPlayerScoreEntries(int gameId, int userId)
         {
-            var scores = await _context.Scores.Include(s => s.VictimUser)
-                .Where(s => s.GameId == gameId && s.UserId == userId)
+            var scores = await _context.Scores
+                .Include(s => s.VictimPlayer)
+                .Include(s => s.Round)
+                .Where(s => s.Round.GameId == gameId && s.PlayerId == userId)
                 .OrderBy(s => s.CreatedAt)
                 .Select(s => new ScoreEntryDto
                 {
                     Id = s.Id,
-                    Points = s.Points,
+                    Points = s.Value,
                     CreatedAt = s.CreatedAt,
                     Type = s.Type,
-                    VictimUserId = s.VictimUserId,
-                    VictimUserName = s.VictimUser != null ? s.VictimUser.Name : null
+                    VictimUserId = s.VictimPlayerId,
+                    VictimUserName = s.VictimPlayerId != null ? s.VictimPlayer.User.Username : null
                 })
                 .ToListAsync();
 
@@ -116,7 +169,7 @@ namespace PokerProject.Services.Scores
             return new PlayerScoreDetailsDto
             {
                 UserId = userId,
-                UserName = user!.Name,
+                UserName = user!.Username,
                 TotalPoints = scores.Sum(s => s.Points),
                 Entries = scores
             };
@@ -124,56 +177,56 @@ namespace PokerProject.Services.Scores
 
         public async Task<ScoreDto> RemoveScoreAsync(int scoreId)
         {
-            var score = await _context.Scores.FindAsync(scoreId);
+            var score = await _context.Scores
+                .Include(s => s.Round)
+                .FirstOrDefaultAsync(s => s.Id == scoreId);
+
             if (score == null)
                 throw new KeyNotFoundException("Score not found");
 
-            var game = await _context.Games.FindAsync(score.GameId);
+            var game = await _context.Games.FindAsync(score.Round.GameId);
+
             if (game == null)
                 throw new KeyNotFoundException("Game not found");
 
             if (game.IsFinished)
                 throw new InvalidOperationException("Game has ended - can't remove points.");
 
-            score.Points = 0;
+            score.Value = 0;
             await _context.SaveChangesAsync();
 
             return new ScoreDto
             {
                 Id = score.Id,
-                GameId = score.GameId,
-                UserId = score.UserId,
-                Points = score.Points
+                PlayerId = score.PlayerId,
+                Points = score.Value
             };
         }
 
-        public async Task<ScoreDto> RegisterRebuyAsync(int gameId, int actorUserId, int targetUserId, bool isAdmin)
+        public async Task<ScoreDto> RegisterRebuyForAdminAsync(int gameId, int actorUserId, int targetUserId, bool isAdmin)
         {
             var game = await _context.Games
-                .Include(g => g.Participants)
+                .Include(g => g.Players)
                 .FirstOrDefaultAsync(g => g.Id == gameId);
 
-            if (game == null)
-                throw new KeyNotFoundException("Game not found");
-
-            if (game.RebuyValue == null)
-                throw new InvalidOperationException("Rebuy value not set by admin");
+            if (game == null) throw new KeyNotFoundException("Game not found");
+            if (game.RebuyValue == null) throw new InvalidOperationException("Rebuy value not set");
 
             if (!isAdmin && actorUserId != targetUserId)
                 throw new UnauthorizedAccessException("Players can only rebuy themselves");
 
-            var participant = game.Participants.FirstOrDefault(p => p.UserId == targetUserId);
+            var player = game.Players.FirstOrDefault(p => p.UserId == targetUserId);
+            if (player == null) throw new InvalidOperationException("Target user is not player");
 
-            if (participant == null)
-                throw new InvalidOperationException("Target user is not participant in game");
+            var round = await GetActiveRound(gameId);
 
-            participant.RebuyCount++;
+            player.RebuyCount++;
 
             var score = new Score
             {
-                GameId = gameId,
-                UserId = targetUserId,
-                Points = -game.RebuyValue.Value,
+                RoundId = round.Id,
+                PlayerId = player.Id,            
+                Value = -game.RebuyValue.Value,
                 CreatedAt = DateTime.UtcNow,
                 Type = Score.ScoreType.Rebuy,
             };
@@ -183,8 +236,12 @@ namespace PokerProject.Services.Scores
 
             return new ScoreDto
             {
-                UserId = targetUserId,
-                Points = score.Points,
+                Id = score.Id,
+                PlayerId = player.Id,
+                UserName = player.User.Username,
+                Points = score.Value,
+                GameId = game.Id,
+                Rounds = new RoundDto { Id = round.Id },
                 Type = score.Type
             };
         }

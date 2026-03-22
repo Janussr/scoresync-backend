@@ -1,9 +1,12 @@
-﻿namespace PokerProject.DTOs
+﻿using PokerProject.Models;
+
+namespace PokerProject.DTOs
 {
     public class UserDto
     {
         public int Id { get; set; }
         public string Username { get; set; } = null!;
-        public string Name { get; set; } = null!;
+        public User.UserRole Role { get; set; }
+
     }
 }

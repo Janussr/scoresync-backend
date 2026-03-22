@@ -10,68 +10,122 @@ namespace PokerProject.Data
 
         public DbSet<User> Users { get; set; }
         public DbSet<Game> Games { get; set; }
+        public DbSet<Player> Players { get; set; }
+        public DbSet<Round> Rounds { get; set; }
         public DbSet<Score> Scores { get; set; }
         public DbSet<HallOfFame> HallOfFames { get; set; }
-        public DbSet<GameParticipant> GameParticipants { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-
-            modelBuilder.Entity<GameParticipant>()
-        .HasIndex(gp => new { gp.GameId, gp.UserId })
-        .IsUnique();
-
-            modelBuilder.Entity<GameParticipant>()
-                .HasOne(gp => gp.Game)
-                .WithMany(g => g.Participants)
-                .HasForeignKey(gp => gp.GameId);
-
-            modelBuilder.Entity<GameParticipant>()
-                .HasOne(gp => gp.User)
-                .WithMany(u => u.GameParticipants)
-                .HasForeignKey(gp => gp.UserId);
+            // =========================
+            // ENUMS
+            // =========================
+            modelBuilder.Entity<User>()
+                .Property(u => u.Role)
+                .HasConversion<string>();
 
             modelBuilder.Entity<Game>()
-                .HasIndex(g => g.GameNumber)
+                .Property(g => g.Type)
+                .HasConversion<string>();
+
+            modelBuilder.Entity<Score>()
+                .Property(s => s.Type)
+                .HasConversion<string>();
+
+            // =========================
+            // USER → PLAYERS
+            // =========================
+            modelBuilder.Entity<User>()
+                .HasMany(u => u.Players)
+                .WithOne(p => p.User)
+                .HasForeignKey(p => p.UserId)
+                .OnDelete(DeleteBehavior.Cascade); // slet players når user slettes
+
+            // =========================
+            // GAME → GAMEMASTER / WINNERPLAYER
+            // =========================
+            modelBuilder.Entity<Game>()
+                .HasOne(g => g.Gamemaster)
+                .WithMany()
+                .HasForeignKey(g => g.GamemasterId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Game>()
+                .HasOne(g => g.WinnerPlayer)
+                .WithMany()
+                .HasForeignKey(g => g.WinnerPlayerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // =========================
+            // GAME → PLAYERS / ROUNDS
+            // =========================
+            modelBuilder.Entity<Game>()
+                .HasMany(g => g.Players)
+                .WithOne(p => p.Game)
+                .HasForeignKey(p => p.GameId)
+                .OnDelete(DeleteBehavior.Cascade); // slet players når game slettes
+
+            modelBuilder.Entity<Game>()
+                .HasMany(g => g.Rounds)
+                .WithOne(r => r.Game)
+                .HasForeignKey(r => r.GameId)
+                .OnDelete(DeleteBehavior.Cascade); // slet rounds når game slettes
+
+            // =========================
+            // PLAYER UNIQUE INDEX
+            // =========================
+            modelBuilder.Entity<Player>()
+                .HasIndex(p => new { p.GameId, p.UserId })
                 .IsUnique();
 
-            // Relations User -> Scores
-            modelBuilder.Entity<User>()
-                .HasMany(u => u.Scores)
-                .WithOne(s => s.User)
-                .HasForeignKey(s => s.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
+            // =========================
+            // ROUND UNIQUE INDEX
+            // =========================
+            modelBuilder.Entity<Round>()
+                .HasIndex(r => new { r.GameId, r.RoundNumber })
+                .IsUnique();
 
-            // Relations User -> HallOfFame
-            modelBuilder.Entity<User>()
-                .HasMany(u => u.HallOfFames)
-                .WithOne(h => h.User)
-                .HasForeignKey(h => h.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<Round>()
+                .HasIndex(r => new { r.GameId, r.EndedAt })
+                .HasFilter("[EndedAt] IS NULL")
+                .IsUnique();
 
-            // Relations Game -> Scores
-            modelBuilder.Entity<Game>()
-                .HasMany(g => g.Scores)
-                .WithOne(s => s.Game)
-                .HasForeignKey(s => s.GameId)
-                .OnDelete(DeleteBehavior.Cascade);
+            // ROUND → SCORES
+            modelBuilder.Entity<Round>()
+                .HasMany(r => r.Scores)
+                .WithOne(s => s.Round)
+                .HasForeignKey(s => s.RoundId)
+                .OnDelete(DeleteBehavior.Cascade); // slet scores når round slettes
 
-            // Relations Game -> HallOfFame (Winner)
-            modelBuilder.Entity<Game>()
-                .HasOne(g => g.Winner)
-                .WithOne(h => h.Game)
-                .HasForeignKey<HallOfFame>(h => h.GameId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            //Convert role enum to string for better readability in the database
-            modelBuilder.Entity<User>()
-           .Property(u => u.Role)
-           .HasConversion<string>();
-
-            //Convert score type enum to string for better readability in the database
+            // =========================
+            // SCORE → PLAYER / VICTIMPLAYER
+            // =========================
             modelBuilder.Entity<Score>()
-       .Property(s => s.Type)
-       .HasConversion<string>();
+                .HasOne(s => s.Player)
+                .WithMany()
+                .HasForeignKey(s => s.PlayerId)
+                .OnDelete(DeleteBehavior.NoAction); // undgå multiple cascade paths
+
+            modelBuilder.Entity<Score>()
+                .HasOne(s => s.VictimPlayer)
+                .WithMany()
+                .HasForeignKey(s => s.VictimPlayerId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            // =========================
+            // HALL OF FAME
+            // =========================
+            modelBuilder.Entity<HallOfFame>()
+                .HasOne(h => h.Game)
+                .WithOne()
+                .HasForeignKey<HallOfFame>(h => h.GameId)
+                .OnDelete(DeleteBehavior.Cascade); // slet HoF hvis game slettes
+
+            modelBuilder.Entity<HallOfFame>()
+                .HasOne(h => h.Player)
+                .WithMany()
+                .HasForeignKey(h => h.PlayerId)
+                .OnDelete(DeleteBehavior.Restrict); // slet ikke HoF entries hvis player slettes
 
             base.OnModelCreating(modelBuilder);
         }

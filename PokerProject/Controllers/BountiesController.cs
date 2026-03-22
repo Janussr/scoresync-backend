@@ -43,7 +43,7 @@ namespace PokerProject.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "Unexpected error");
+                return StatusCode(500, ex);
             }
         }
 
@@ -74,7 +74,7 @@ namespace PokerProject.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "Unexpected error");
+                return StatusCode(500, ex);
             }
         }
 

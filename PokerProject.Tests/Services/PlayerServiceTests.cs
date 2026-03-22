@@ -2,11 +2,11 @@
 using Microsoft.EntityFrameworkCore;
 using PokerProject.Data;
 using PokerProject.Models;
-using PokerProject.Services.Participants;
+using PokerProject.Services.Players;
 
 namespace PokerProject.Tests.Services
 {
-    public class ParticipantServiceTests
+    public class PlayerServiceTests
     {
 
         private PokerDbContext GetDbContext()
@@ -23,15 +23,15 @@ namespace PokerProject.Tests.Services
         public async Task AddParticipants_ShouldAddNewParticipants()
         {
             var context = GetDbContext();
-            var service = new ParticipantService(context);
+            var service = new PlayerService(context);
 
             var game = new Game { GameNumber = 1, StartedAt = DateTime.UtcNow };
             context.Games.Add(game);
             await context.SaveChangesAsync();
 
-            await service.AddParticipantsAsync(game.Id, new List<int> { 1, 2 });
+            await service.AddPlayersToGameAsAdminAsync(game.Id, new List<int> { 1, 2 });
 
-            var participants = await context.GameParticipants
+            var participants = await context.Players
                 .Where(p => p.GameId == game.Id)
                 .ToListAsync();
 
@@ -42,17 +42,17 @@ namespace PokerProject.Tests.Services
         public async Task RemoveParticipant_ShouldRemoveParticipant()
         {
             var context = GetDbContext();
-            var service = new ParticipantService(context);
+            var service = new PlayerService(context);
 
             var game = new Game { GameNumber = 1, StartedAt = DateTime.UtcNow };
             context.Games.Add(game);
-            context.GameParticipants.Add(new GameParticipant { GameId = game.Id, UserId = 1 });
+            context.Players.Add(new Player { GameId = game.Id, UserId = 1 });
             await context.SaveChangesAsync();
 
-            var remaining = await service.RemoveParticipantAsync(game.Id, 1);
+            var remaining = await service.RemovePlayerAsync(game.Id, 1);
 
             remaining.Should().BeEmpty();
-            (await context.GameParticipants.CountAsync()).Should().Be(0);
+            (await context.Players.CountAsync()).Should().Be(0);
         }
 
 

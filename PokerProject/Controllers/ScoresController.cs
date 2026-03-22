@@ -88,7 +88,7 @@ namespace PokerProject.Controllers
         }
 
 
-
+        //For player
         [Authorize]
         [HttpPost("{gameId}/rebuy")]
         public async Task<IActionResult> Rebuy(int gameId)
@@ -98,7 +98,7 @@ namespace PokerProject.Controllers
                 var userId = User.GetUserId();
                 var isAdmin = User.GetUserRole() == "Admin";
 
-                var result = await _scoreService.RegisterRebuyAsync(
+                var result = await _scoreService.RegisterRebuyForAdminAsync(
                     gameId,
                     userId,
                     userId,
@@ -121,20 +121,21 @@ namespace PokerProject.Controllers
             }
         }
 
+        //For admin
         [Authorize(Roles = "Admin, Gamemaster")]
         [HttpPost("{gameId}/admin/rebuy")]
-        public async Task<IActionResult> AdminRebuy(int gameId, [FromBody] int targetUserId)
+        public async Task<IActionResult> AdminRebuy([FromBody] RebuyRequestDto req)
         {
 
             try
             {
                 var adminId = User.GetUserId();
 
-                var result = await _scoreService.RegisterRebuyAsync(
-                    gameId,
-                    adminId,
-                    targetUserId,
-                    true
+                var result = await _scoreService.RegisterRebuyForAdminAsync(
+                  req.GameId,
+            req.ActorUserId,
+            req.TargetUserId,
+            req.IsAdmin
                 );
 
                 return Ok(result);

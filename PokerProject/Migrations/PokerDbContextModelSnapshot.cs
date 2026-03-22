@@ -39,6 +39,9 @@ namespace PokerProject.Migrations
                     b.Property<int>("GameNumber")
                         .HasColumnType("int");
 
+                    b.Property<int>("GamemasterId")
+                        .HasColumnType("int");
+
                     b.Property<bool>("IsFinished")
                         .HasColumnType("bit");
 
@@ -48,15 +51,23 @@ namespace PokerProject.Migrations
                     b.Property<DateTime>("StartedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("WinnerPlayerId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("GameNumber")
-                        .IsUnique();
+                    b.HasIndex("GamemasterId");
+
+                    b.HasIndex("WinnerPlayerId");
 
                     b.ToTable("Games");
                 });
 
-            modelBuilder.Entity("HallOfFame", b =>
+            modelBuilder.Entity("PokerProject.Models.HallOfFame", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -67,26 +78,28 @@ namespace PokerProject.Migrations
                     b.Property<int>("GameId")
                         .HasColumnType("int");
 
-                    b.Property<int>("UserId")
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("UserId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("WinDate")
                         .HasColumnType("datetime2");
-
-                    b.Property<int>("WinningScore")
-                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
                     b.HasIndex("GameId")
                         .IsUnique();
 
+                    b.HasIndex("PlayerId");
+
                     b.HasIndex("UserId");
 
                     b.ToTable("HallOfFames");
                 });
 
-            modelBuilder.Entity("PokerProject.Models.GameParticipant", b =>
+            modelBuilder.Entity("PokerProject.Models.Player", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -99,6 +112,12 @@ namespace PokerProject.Migrations
 
                     b.Property<int>("GameId")
                         .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LeftAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<int>("RebuyCount")
                         .HasColumnType("int");
@@ -113,7 +132,39 @@ namespace PokerProject.Migrations
                     b.HasIndex("GameId", "UserId")
                         .IsUnique();
 
-                    b.ToTable("GameParticipants");
+                    b.ToTable("Players");
+                });
+
+            modelBuilder.Entity("PokerProject.Models.Round", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("EndedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("GameId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RoundNumber")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GameId", "EndedAt")
+                        .IsUnique()
+                        .HasFilter("[EndedAt] IS NULL");
+
+                    b.HasIndex("GameId", "RoundNumber")
+                        .IsUnique();
+
+                    b.ToTable("Rounds");
                 });
 
             modelBuilder.Entity("PokerProject.Models.User", b =>
@@ -126,10 +177,6 @@ namespace PokerProject.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -159,43 +206,84 @@ namespace PokerProject.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("GameId")
+                    b.Property<int>("PlayerId")
                         .HasColumnType("int");
 
-                    b.Property<int>("Points")
+                    b.Property<int?>("RoundId")
                         .HasColumnType("int");
 
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("UserId")
+                    b.Property<int>("Value")
                         .HasColumnType("int");
 
-                    b.Property<int?>("VictimUserId")
+                    b.Property<int?>("VictimPlayerId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("GameId");
+                    b.HasIndex("PlayerId");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("RoundId");
 
-                    b.HasIndex("VictimUserId");
+                    b.HasIndex("VictimPlayerId");
 
                     b.ToTable("Scores");
                 });
 
-            modelBuilder.Entity("HallOfFame", b =>
+            modelBuilder.Entity("Game", b =>
+                {
+                    b.HasOne("PokerProject.Models.User", "Gamemaster")
+                        .WithMany()
+                        .HasForeignKey("GamemasterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PokerProject.Models.Player", "WinnerPlayer")
+                        .WithMany()
+                        .HasForeignKey("WinnerPlayerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Gamemaster");
+
+                    b.Navigation("WinnerPlayer");
+                });
+
+            modelBuilder.Entity("PokerProject.Models.HallOfFame", b =>
                 {
                     b.HasOne("Game", "Game")
-                        .WithOne("Winner")
-                        .HasForeignKey("HallOfFame", "GameId")
+                        .WithOne()
+                        .HasForeignKey("PokerProject.Models.HallOfFame", "GameId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PokerProject.Models.Player", "Player")
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PokerProject.Models.User", null)
+                        .WithMany("HallOfFames")
+                        .HasForeignKey("UserId");
+
+                    b.Navigation("Game");
+
+                    b.Navigation("Player");
+                });
+
+            modelBuilder.Entity("PokerProject.Models.Player", b =>
+                {
+                    b.HasOne("Game", "Game")
+                        .WithMany("Players")
+                        .HasForeignKey("GameId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("PokerProject.Models.User", "User")
-                        .WithMany("HallOfFames")
+                        .WithMany("Players")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -205,66 +293,59 @@ namespace PokerProject.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("PokerProject.Models.GameParticipant", b =>
+            modelBuilder.Entity("PokerProject.Models.Round", b =>
                 {
                     b.HasOne("Game", "Game")
-                        .WithMany("Participants")
+                        .WithMany("Rounds")
                         .HasForeignKey("GameId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("PokerProject.Models.User", "User")
-                        .WithMany("GameParticipants")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation("Game");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Score", b =>
                 {
-                    b.HasOne("Game", "Game")
-                        .WithMany("Scores")
-                        .HasForeignKey("GameId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("PokerProject.Models.User", "User")
-                        .WithMany("Scores")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("PokerProject.Models.User", "VictimUser")
+                    b.HasOne("PokerProject.Models.Player", "Player")
                         .WithMany()
-                        .HasForeignKey("VictimUserId");
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
 
-                    b.Navigation("Game");
+                    b.HasOne("PokerProject.Models.Round", "Round")
+                        .WithMany("Scores")
+                        .HasForeignKey("RoundId")
+                        .OnDelete(DeleteBehavior.Cascade);
 
-                    b.Navigation("User");
+                    b.HasOne("PokerProject.Models.Player", "VictimPlayer")
+                        .WithMany()
+                        .HasForeignKey("VictimPlayerId")
+                        .OnDelete(DeleteBehavior.NoAction);
 
-                    b.Navigation("VictimUser");
+                    b.Navigation("Player");
+
+                    b.Navigation("Round");
+
+                    b.Navigation("VictimPlayer");
                 });
 
             modelBuilder.Entity("Game", b =>
                 {
-                    b.Navigation("Participants");
+                    b.Navigation("Players");
 
+                    b.Navigation("Rounds");
+                });
+
+            modelBuilder.Entity("PokerProject.Models.Round", b =>
+                {
                     b.Navigation("Scores");
-
-                    b.Navigation("Winner");
                 });
 
             modelBuilder.Entity("PokerProject.Models.User", b =>
                 {
-                    b.Navigation("GameParticipants");
-
                     b.Navigation("HallOfFames");
 
-                    b.Navigation("Scores");
+                    b.Navigation("Players");
                 });
 #pragma warning restore 612, 618
         }

@@ -1,35 +1,18 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
 using PokerProject.Data;
 using PokerProject.DTOs;
 using PokerProject.Models;
 using System.Data;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
 
 namespace PokerProject.Services.Users
 {
     public class UserService : IUserService
     {
         private readonly PokerDbContext _context;
-        private readonly string _jwtKey;
 
-        public UserService(PokerDbContext context, IConfiguration configuration)
+        public UserService(PokerDbContext context)
         {
             _context = context;
-
-            _jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET")!;
-
-            if (string.IsNullOrEmpty(_jwtKey))
-            {
-                _jwtKey = configuration["JwtSettings:Secret"]!;
-            }
-
-            if (string.IsNullOrEmpty(_jwtKey))
-            {
-                throw new Exception("JWT Secret not set! Put it in .env or appsettings.");
-            }
         }
 
         public async Task<IEnumerable<UserDto>> GetAllUsersAsync()
@@ -37,7 +20,6 @@ namespace PokerProject.Services.Users
             return await _context.Users.Select(u => new UserDto {
                     Id = u.Id,
                     Username = u.Username,
-                    Name = u.Name
                 }).ToListAsync();
         }
 
@@ -50,7 +32,7 @@ namespace PokerProject.Services.Users
             {
                 Id = user.Id,
                 Username = user.Username,
-                Name = user.Name
+                Role = user.Role,
             };
         }
 
@@ -66,7 +48,6 @@ namespace PokerProject.Services.Users
             var user = new User
             {
                 Username = dto.Username,
-                Name = dto.Name,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
                 Role = dto.Role
             };
@@ -78,8 +59,18 @@ namespace PokerProject.Services.Users
             {
                 Id = user.Id,
                 Username = user.Username,
-                Name = user.Name
             };
+        }
+
+        public async Task<User?> ValidateUserAsync(string username, string password)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == username);
+            if (user == null) return null;
+
+            bool verified = BCrypt.Net.BCrypt.Verify(password, user.PasswordHash);
+            if (!verified) return null;
+
+            return user;
         }
 
         public async Task<UserDto?> AdminResetPasswordAsync(int userId, string newPassword)
@@ -95,7 +86,6 @@ namespace PokerProject.Services.Users
             {
                 Id = user.Id,
                 Username = user.Username,
-                Name = user.Name
             };
         }
 
@@ -112,41 +102,9 @@ namespace PokerProject.Services.Users
             {
                 Id = user.Id,
                 Username = user.Username,
-                Name = user.Name
             };
         }
-
-        public async Task<string?> LoginAndGenerateTokenAsync(string username, string password)
-        {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == username);
-            if (user == null) return null;
-
-            bool verified = BCrypt.Net.BCrypt.Verify(password, user.PasswordHash);
-            if (!verified) return null;
-
-            return GenerateJwtToken(user);
-        }
-
-       public string GenerateJwtToken(User user)
-    {
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var key = Encoding.ASCII.GetBytes(_jwtKey);
-
-            var tokenDescriptor = new SecurityTokenDescriptor
-            {
-                Subject = new ClaimsIdentity(new[]
-                {
-                new Claim("id", user.Id.ToString()),
-                new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Role, user.Role.ToString())
-            }),
-                Expires = DateTime.UtcNow.AddDays(1),
-                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
-            };
-
-        var token = tokenHandler.CreateToken(tokenDescriptor);
-        return tokenHandler.WriteToken(token);
     }
 
-    }
+
 }
