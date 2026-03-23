@@ -11,7 +11,6 @@ using PokerProject.Services.Players;
 using PokerProject.Services.Rounds;
 using PokerProject.Services.Scores;
 using PokerProject.Services.Users;
-//using System.Text;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -22,28 +21,6 @@ DotNetEnv.Env.Load();
 //Connection string for database, loaded from env variable
 //var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING");
 
-//var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET")
-//                ?? throw new InvalidOperationException("JWT_SECRET not set");
-//var key = Encoding.ASCII.GetBytes(jwtSecret);
-
-// JWT Authentication
-//builder.Services.AddAuthentication(options =>
-//{
-//    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-//    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-//})
-//.AddJwtBearer(options =>
-//{
-//    options.TokenValidationParameters = new TokenValidationParameters
-//    {
-//        ValidateIssuerSigningKey = true,
-//        IssuerSigningKey = new SymmetricSecurityKey(key),
-//        ValidateIssuer = false,
-//        ValidateAudience = false,
-//        ClockSkew = TimeSpan.Zero,
-//    };
-//});
-
 // Add services to the container.
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -51,10 +28,8 @@ builder.Services.AddOpenApi();
 
 
 // DATABASE 
-
 //incomment for local db
 builder.Services.AddDbContext<PokerDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-
 //incomment for prod db
 //builder.Services.AddDbContext<PokerDbContext>(options => options.UseSqlServer(connectionString));
 
@@ -105,9 +80,6 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     });
 
 var app = builder.Build();
-
-
-app.MapGet("/", () => "Backend runs!");
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
