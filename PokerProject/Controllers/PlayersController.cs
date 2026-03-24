@@ -35,7 +35,7 @@ namespace PokerProject.Controllers
             }
         }
 
-        [HttpGet("{gameId}/participants")]
+        [HttpGet("{gameId}/players")]
         public async Task<ActionResult<List<PlayerDto>>> GetPlayers(int gameId)
         {
             try
@@ -53,13 +53,13 @@ namespace PokerProject.Controllers
             }
         }
 
-        [HttpDelete("{gameId}/participants/{userId}")]
+        [HttpDelete("{gameId}/player/{playerId}")]
         [Authorize(Roles = "Admin, Gamemaster")]
-        public async Task<IActionResult> RemovePlayer(int gameId, int userId)
+        public async Task<IActionResult> RemovePlayer(int gameId, int playerId)
         {
             try
             {
-                var updatedPlayers = await _playerService.RemovePlayerAsync(gameId, userId);
+                var updatedPlayers = await _playerService.RemovePlayerAsync(gameId, playerId);
                 return Ok(updatedPlayers);
             }
             catch (InvalidOperationException ex)

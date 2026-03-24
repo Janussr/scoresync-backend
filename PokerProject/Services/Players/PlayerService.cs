@@ -21,7 +21,7 @@ namespace PokerProject.Services.Players
             if (game == null)
                 throw new KeyNotFoundException("Game not found");
 
-            var addedPlayers = new List<PlayerDto>();
+            var players = new List<Player>();
 
             foreach (var userId in userIds)
             {
@@ -35,20 +35,32 @@ namespace PokerProject.Services.Players
                         GameId = gameId,
                         UserId = userId
                     };
+
                     _context.Players.Add(player);
-                    addedPlayers.Add(new PlayerDto
-                    {
-                        UserId = player.UserId,
-                        Username = (await _context.Users.FindAsync(userId))?.Username ?? "Unknown",
-                        RebuyCount = 0,
-                        ActiveBounties = 0,
-                        IsActive = true
-                    });
+                    players.Add(player);
                 }
             }
 
-            await _context.SaveChangesAsync();
-            return addedPlayers;
+            await _context.SaveChangesAsync(); 
+
+            var result = new List<PlayerDto>();
+
+            foreach (var player in players)
+            {
+                var user = await _context.Users.FindAsync(player.UserId);
+
+                result.Add(new PlayerDto
+                {
+                    PlayerId = player.Id, 
+                    UserId = player.UserId,
+                    Username = user?.Username ?? "Unknown",
+                    RebuyCount = 0,
+                    ActiveBounties = 0,
+                    IsActive = true
+                });
+            }
+
+            return result;
         }
 
         public async Task<List<PlayerDto>> GetPlayersAsync(int gameId)
@@ -70,7 +82,7 @@ namespace PokerProject.Services.Players
                 .AnyAsync(gp => gp.GameId == gameId && gp.UserId == userId);
         }
 
-        public async Task<List<PlayerDto>> RemovePlayerAsync(int gameId, int userId)
+        public async Task<List<PlayerDto>> RemovePlayerAsync(int gameId, int playerId)
         {
             var game = await _context.Games
                 .Include(g => g.Players)
@@ -83,7 +95,7 @@ namespace PokerProject.Services.Players
                 throw new InvalidOperationException("Cannot remove players from a finished game");
 
             var player = await _context.Players
-                .FirstOrDefaultAsync(p => p.GameId == gameId && p.UserId == userId);
+                .FirstOrDefaultAsync(p => p.GameId == gameId && p.Id == playerId);
 
             if (player == null)
                 throw new InvalidOperationException("User is not a player in this game");
@@ -96,6 +108,7 @@ namespace PokerProject.Services.Players
                 .Include(p => p.User)
                 .Select(p => new PlayerDto
                 {
+                    PlayerId = p.Id,
                     UserId = p.UserId,
                     Username = p.User.Username
                 })
