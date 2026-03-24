@@ -15,7 +15,7 @@ namespace PokerProject.Services.Games
         Task<List<GameListDto>> GetActiveGamesLobbyListAsync();
         //Task<List<GameDto>> GetActiveGamesAsync();
         Task<List<GameDto>> GetAllGamesAsync();
-        Task<GameDto?> GetGameByIdAsync(int gameId);
+        //Task<GameDto?> GetGameByIdAsync(int gameId);
         Task<GameDetailsDto?> GetGameDetailsAsync(int gameId, string? role);
         Task UpdateRulesAsync(int gameId, UpdateRulesDto dto);
         Task LeaveGameAsync(int gameId, int userId);

@@ -24,7 +24,8 @@ namespace PokerProject.Services.Scores
             return round;
         }
 
-        public async Task<ScoreDto> AddScoreAsync(int gameId, int userId, int points)
+        //USED TO ADD SCORE AS EITHER ADMIN OR PLAYER
+        public async Task<ScoreDto> AddScoreAsync(int gameId, int currentUserId, int points, int? targetPlayerId = null)
         {
             var game = await _context.Games.FindAsync(gameId);
             if (game == null)
@@ -37,17 +38,28 @@ namespace PokerProject.Services.Scores
             if (round == null)
                 throw new InvalidOperationException("No active round found for this game.");
 
-            var player = await _context.Players
-                .Include(p => p.User) 
-                .FirstOrDefaultAsync(p => p.GameId == gameId && p.UserId == userId);
+            if (targetPlayerId == null)
+            {
+                var currentPlayer = await _context.Players
+                    .FirstOrDefaultAsync(p => p.GameId == gameId && p.UserId == currentUserId);
 
-            if (player == null)
-                throw new InvalidOperationException("Player not found in this game.");
+                if (currentPlayer == null)
+                    throw new InvalidOperationException("You are not a player in this game.");
+
+                targetPlayerId = currentPlayer.Id;
+            }
+
+            var targetPlayer = await _context.Players
+                .Include(p => p.User)
+                .FirstOrDefaultAsync(p => p.Id == targetPlayerId.Value && p.GameId == gameId);
+
+            if (targetPlayer == null)
+                throw new InvalidOperationException("Target player not found in this game.");
 
             var score = new Score
             {
                 RoundId = round.Id,
-                PlayerId = player.Id,      
+                PlayerId = targetPlayer.Id,
                 Value = points,
                 CreatedAt = DateTime.UtcNow,
                 Type = Score.ScoreType.Chips,
@@ -58,8 +70,8 @@ namespace PokerProject.Services.Scores
 
             return new ScoreDto
             {
-                PlayerId = player.Id,         
-                UserId = player.UserId,
+                PlayerId = targetPlayer.Id,
+                UserId = targetPlayer.UserId,
                 Points = score.Value,
                 Type = score.Type,
                 Rounds = new RoundDto
@@ -70,6 +82,10 @@ namespace PokerProject.Services.Scores
                 }
             };
         }
+
+
+
+
 
         public async Task<List<ScoreDto>> AddScoresBulkAsync(BulkAddScoresDto dto)
         {
@@ -203,29 +219,36 @@ namespace PokerProject.Services.Scores
             };
         }
 
-        public async Task<ScoreDto> RegisterRebuyForAdminAsync(int gameId, int actorUserId, int targetUserId, bool isAdmin)
+        public async Task<ScoreDto> RegisterRebuyAsync(int gameId, int actorUserId, int? targetPlayerId = null)
         {
             var game = await _context.Games
                 .Include(g => g.Players)
+                    .ThenInclude(p => p.User)
                 .FirstOrDefaultAsync(g => g.Id == gameId);
 
-            if (game == null) throw new KeyNotFoundException("Game not found");
-            if (game.RebuyValue == null) throw new InvalidOperationException("Rebuy value not set");
+            if (game == null)
+                throw new KeyNotFoundException("Game not found");
 
-            if (!isAdmin && actorUserId != targetUserId)
-                throw new UnauthorizedAccessException("Players can only rebuy themselves");
-
-            var player = game.Players.FirstOrDefault(p => p.UserId == targetUserId);
-            if (player == null) throw new InvalidOperationException("Target user is not player");
+            if (game.RebuyValue == null)
+                throw new InvalidOperationException("Rebuy value not set");
 
             var round = await GetActiveRound(gameId);
+            if (round == null)
+                throw new InvalidOperationException("No active round");
+
+            var player = targetPlayerId.HasValue
+                ? game.Players.FirstOrDefault(p => p.Id == targetPlayerId.Value)     
+                : game.Players.FirstOrDefault(p => p.UserId == actorUserId);        
+
+            if (player == null)
+                throw new InvalidOperationException("Player not found in this game");
 
             player.RebuyCount++;
 
             var score = new Score
             {
                 RoundId = round.Id,
-                PlayerId = player.Id,            
+                PlayerId = player.Id,
                 Value = -game.RebuyValue.Value,
                 CreatedAt = DateTime.UtcNow,
                 Type = Score.ScoreType.Rebuy,
@@ -238,10 +261,14 @@ namespace PokerProject.Services.Scores
             {
                 Id = score.Id,
                 PlayerId = player.Id,
-                UserName = player.User.Username,
+                UserName = player.User?.Username ?? "Unknown",
                 Points = score.Value,
                 GameId = game.Id,
-                Rounds = new RoundDto { Id = round.Id },
+                Rounds = new RoundDto
+                {
+                    Id = round.Id,
+                    RoundNumber = round.RoundNumber
+                },
                 Type = score.Type
             };
         }

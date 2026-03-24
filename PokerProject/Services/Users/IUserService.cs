@@ -11,6 +11,5 @@ namespace PokerProject.Services.Users
         Task<User?> ValidateUserAsync(string username, string password);
         Task<UserDto?> AdminResetPasswordAsync(int userId, string newPassword);
         Task<UserDto?> SetUserRoleAsync(SetUserRoleDto dto);
-        //Task<string?> LoginAndGenerateTokenAsync(string username, string password);
     }
 }

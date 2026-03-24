@@ -18,19 +18,65 @@ namespace PokerProject.Controllers
 
 
         [Authorize(Roles = "Admin, User, Gamemaster")]
-        [HttpPost("{gameId}/score")]
-        public async Task<ActionResult<ScoreDto>> AddScore(int gameId, [FromBody] AddScoreDto dto)
+        [HttpPost("player/addscore")]
+        public async Task<IActionResult> AddScorePlayer([FromBody] AddScoreDto request)
         {
             try
             {
-                var added = await _scoreService.AddScoreAsync(gameId, dto.UserId, dto.Value);
-                return Ok(added);
+                var currentUserId = User.GetUserId(); 
+
+                var result = await _scoreService.AddScoreAsync(request.GameId, currentUserId, request.Value, null);
+                return Ok(result);
             }
             catch (InvalidOperationException ex)
             {
                 return BadRequest(ex.Message);
             }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
         }
+
+        [Authorize(Roles = "Admin, User, Gamemaster")]
+        [HttpPost("admin/addscore")]
+        public async Task<IActionResult> AddScoreAdmin([FromBody] AddScoreAdminDto request)
+        {
+            try
+            {
+                var currentUserId = User.GetUserId(); 
+
+                var result = await _scoreService.AddScoreAsync(
+                    request.GameId,
+                    currentUserId,
+                    request.Value,
+                    request.TargetPlayerId
+                );
+
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
+
+
+
+
 
         [HttpGet("{gameId}/players/{userId}/scores")]
         public async Task<ActionResult<PlayerScoreDetailsDto>> GetPlayerScores(int gameId, int userId)
@@ -90,21 +136,14 @@ namespace PokerProject.Controllers
 
         //For player
         [Authorize]
-        [HttpPost("{gameId}/rebuy")]
+        [HttpPost("{gameId}/player/rebuy")]
         public async Task<IActionResult> Rebuy(int gameId)
         {
             try
             {
                 var userId = User.GetUserId();
-                var isAdmin = User.GetUserRole() == "Admin";
 
-                var result = await _scoreService.RegisterRebuyForAdminAsync(
-                    gameId,
-                    userId,
-                    userId,
-                    isAdmin
-                );
-
+                var result = await _scoreService.RegisterRebuyAsync(gameId, userId);
                 return Ok(result);
             }
             catch (UnauthorizedAccessException ex)
@@ -124,21 +163,15 @@ namespace PokerProject.Controllers
         //For admin
         [Authorize(Roles = "Admin, Gamemaster")]
         [HttpPost("{gameId}/admin/rebuy")]
-        public async Task<IActionResult> AdminRebuy([FromBody] RebuyRequestDto req)
+        public async Task<IActionResult> AdminRebuy(int gameId, [FromBody] int targetPlayerId)
         {
-
             try
             {
                 var adminId = User.GetUserId();
 
-                var result = await _scoreService.RegisterRebuyForAdminAsync(
-                  req.GameId,
-            req.ActorUserId,
-            req.TargetUserId,
-            req.IsAdmin
-                );
-
+                var result = await _scoreService.RegisterRebuyAsync(gameId, adminId, targetPlayerId);
                 return Ok(result);
+
             }
             catch (UnauthorizedAccessException ex)
             {
@@ -152,7 +185,7 @@ namespace PokerProject.Controllers
             {
                 return StatusCode(500, ex.Message);
             }
-
         }
+
     }
-}
+    }
