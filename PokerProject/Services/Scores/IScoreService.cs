@@ -7,7 +7,7 @@ namespace PokerProject.Services.Scores
         Task<ScoreDto> AddScoreAsync(int gameId, int currentUserId, int points, int? targetPlayerId = null);
         Task<ScoreDto> RemoveScoreAsync(int scoreId);
         Task<List<ScoreDto>> AddScoresBulkAsync(BulkAddScoresDto dto);
-        Task<PlayerScoreDetailsDto> GetPlayerScoreEntries(int gameId, int userId);
+        Task<PlayerScoreDetailsDto> GetPlayerScoreEntries(int gameId, int playerId);
         Task<ScoreDto> RegisterRebuyAsync(int gameId, int actorUserId, int? targetPlayerId = null);
 
     }

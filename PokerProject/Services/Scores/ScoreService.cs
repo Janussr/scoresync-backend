@@ -159,44 +159,59 @@ namespace PokerProject.Services.Scores
             }
         }
 
-        public async Task<PlayerScoreDetailsDto> GetPlayerScoreEntries(int gameId, int userId)
+        public async Task<PlayerScoreDetailsDto> GetPlayerScoreEntries(int gameId, int playerId)
         {
             var player = await _context.Players
                 .Include(p => p.User)
-                .FirstOrDefaultAsync(p => p.GameId == gameId && p.UserId == userId);
+                .FirstOrDefaultAsync(p => p.GameId == gameId && p.Id == playerId);
 
             if (player == null)
                 throw new KeyNotFoundException("Player not found in this game");
 
+            // Hent alle scores for denne player i spillet
             var scores = await _context.Scores
                 .Include(s => s.VictimPlayer)
                     .ThenInclude(v => v.User)
                 .Include(s => s.Round)
                 .Where(s => s.Round.GameId == gameId && s.PlayerId == player.Id)
                 .OrderBy(s => s.CreatedAt)
-                .Select(s => new ScoreEntryDto
-                {
-                    Id = s.Id,
-                    Points = s.Value,
-                    CreatedAt = s.CreatedAt,
-                    Type = s.Type,
-                    VictimUserId = s.VictimPlayerId != null ? s.VictimPlayer.UserId : null,
-                    VictimUserName = s.VictimPlayerId != null ? s.VictimPlayer.User.Username : null
-                })
                 .ToListAsync();
 
             if (!scores.Any())
                 throw new KeyNotFoundException("No scores found for this player in this game");
 
+            // Gruppér scores per round
+            var roundGroups = scores
+                .GroupBy(s => s.RoundId)
+                .Select(g => new RoundScoreDto
+                {
+                    RoundId = g.Key!.Value,
+                    RoundNumber = g.First().Round.RoundNumber,
+                    StartedAt = g.First().Round.StartedAt,
+                    TotalPoints = g.Sum(s => s.Value),
+                    Entries = g.Select(s => new ScoreEntryDto
+                    {
+                        Id = s.Id,
+                        Points = s.Value,
+                        CreatedAt = s.CreatedAt,
+                        Type = s.Type,
+                        VictimUserId = s.VictimPlayerId != null ? s.VictimPlayer.UserId : null,
+                        VictimUserName = s.VictimPlayerId != null ? s.VictimPlayer.User.Username : null
+                    }).ToList()
+                })
+                .OrderBy(r => r.RoundNumber)
+                .ToList();
+
             return new PlayerScoreDetailsDto
             {
-                UserId = userId,
+                UserId = player.UserId,
                 PlayerId = player.Id,
                 UserName = player.User.Username,
-                TotalPoints = scores.Sum(s => s.Points),
-                Entries = scores
+                TotalPoints = scores.Sum(s => s.Value),
+                Rounds = roundGroups
             };
         }
+
         public async Task<ScoreDto> RemoveScoreAsync(int scoreId)
         {
             var score = await _context.Scores

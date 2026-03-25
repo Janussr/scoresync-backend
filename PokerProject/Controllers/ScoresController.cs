@@ -78,12 +78,12 @@ namespace PokerProject.Controllers
 
 
 
-        [HttpGet("{gameId}/players/{userId}/scores")]
-        public async Task<ActionResult<PlayerScoreDetailsDto>> GetPlayerScores(int gameId, int userId)
+        [HttpGet("{gameId}/players/{playerId}/scores")]
+        public async Task<ActionResult<PlayerScoreDetailsDto>> GetPlayerScores(int gameId, int playerId)
         {
             try
             {
-                var result = await _scoreService.GetPlayerScoreEntries(gameId, userId);
+                var result = await _scoreService.GetPlayerScoreEntries(gameId, playerId);
                 return Ok(result);
             }
             catch (KeyNotFoundException e)
