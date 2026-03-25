@@ -143,58 +143,79 @@ namespace PokerProject.Services.Games
         {
             var game = await _context.Games
                 .Include(g => g.Rounds)
-                .ThenInclude(r => r.Scores)
+                    .ThenInclude(r => r.Scores)
+                .Include(g => g.Players)
+                    .ThenInclude(p => p.User)
                 .FirstOrDefaultAsync(g => g.Id == gameId);
 
             if (game == null)
                 throw new KeyNotFoundException("Game not found");
 
+            if (game.IsFinished)
+                throw new InvalidOperationException("Game already finished");
+
+            // Afslut aktiv runde, hvis den findes
             var activeRound = game.Rounds.FirstOrDefault(r => r.EndedAt == null);
             if (activeRound != null)
-            {
                 activeRound.EndedAt = DateTime.UtcNow;
-            }
-
-            if (game.IsFinished)
-                throw new KeyNotFoundException("Game already finished");
 
             var allScores = game.Rounds.SelectMany(r => r.Scores).ToList();
-
-
             if (!allScores.Any())
                 throw new InvalidOperationException("No scores registered");
 
+            var activePlayerIds = game.Players
+    .Where(p => p.IsActive)
+    .Select(p => p.Id)
+    .ToList();
+
+
+            // Summer scores pr. Player.Id
             var totals = allScores
-                 .GroupBy(s => s.PlayerId)
-                 .Select(g => new
-                {
-                    UserId = g.Key,
-                    Total = g.Sum(x => x.Value)
-                })
-                .OrderByDescending(x => x.Total)
-                .ToList();
+    .Where(s => activePlayerIds.Contains(s.PlayerId))
+    .GroupBy(s => s.PlayerId)
+    .Select(g => new
+    {
+        PlayerId = g.Key,
+        TotalScore = g.Sum(s => s.Value)
+    })
+    .OrderByDescending(x => x.TotalScore)
+    .ToList();
+
+            if (!totals.Any())
+                throw new InvalidOperationException("No active players to determine winner");
 
             var winnerData = totals.First();
 
+            // Find vinderen i Player-listen baseret på Player.Id
+            var winnerPlayer = game.Players.FirstOrDefault(p => p.Id == winnerData.PlayerId);
+            if (winnerPlayer == null)
+                throw new InvalidOperationException("Winner player not found in game");
+
+            // Sæt winner i Game
+            game.WinnerPlayerId = winnerPlayer.Id;
+            game.WinnerPlayer = winnerPlayer;
+
+            // Tilføj til HallOfFame
             var hallOfFame = new HallOfFame
             {
                 GameId = game.Id,
-                PlayerId = winnerData.UserId,
+                PlayerId = winnerPlayer.Id,
                 WinDate = DateTime.UtcNow
             };
-
             _context.HallOfFames.Add(hallOfFame);
 
+            // Afslut spillet
             game.IsFinished = true;
             game.EndedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
 
-            // SIGNALR HERE
+            // SIGNALR notification
             await _hubContext.Clients
                 .Group($"Game-{game.Id}")
                 .SendAsync("GameFinished", game.Id);
 
+            // Returnér GameDto inkl. vinderen
             return new GameDto
             {
                 Id = game.Id,
@@ -202,6 +223,13 @@ namespace PokerProject.Services.Games
                 StartedAt = game.StartedAt,
                 EndedAt = game.EndedAt,
                 IsFinished = game.IsFinished,
+                Winner = new WinnerDto
+                {
+                    PlayerId = winnerPlayer.Id,
+                    UserName = winnerPlayer.User.Username,
+                    WinningScore = winnerData.TotalScore,
+                    WinDate = game.EndedAt.Value
+                }
             };
         }
 
@@ -252,6 +280,8 @@ namespace PokerProject.Services.Games
 
             if (game == null) return null;
 
+            var activePlayers = game.Players.Where(p => p.IsActive).ToList();
+
             return new GamePanelDto
             {
                 Id = game.Id,
@@ -298,7 +328,7 @@ namespace PokerProject.Services.Games
                     .ThenInclude(w => w.User)
                 .Include(g => g.Players)
                     .ThenInclude(p => p.User)
-                .Where(g => !g.IsFinished && g.Players.Any(p => p.UserId == userId))
+                .Where(g => !g.IsFinished && g.Players.Any(p => p.UserId == userId && p.IsActive))
                 .FirstOrDefaultAsync();
 
             if (game == null) return null;
@@ -489,9 +519,9 @@ namespace PokerProject.Services.Games
                         PlayerId = g.WinnerPlayer.UserId,
                         UserName = g.WinnerPlayer.User.Username,
                         WinningScore = g.Rounds
-                            .SelectMany(r => r.Scores)
-                            .Where(s => s.PlayerId == g.WinnerPlayerId)
-                            .Sum(s => s.Value),
+        .SelectMany(r => r.Scores)
+        .Where(s => s.PlayerId == g.WinnerPlayerId)
+        .Sum(s => s.Value),
                         WinDate = g.EndedAt ?? DateTime.UtcNow
                     }
                 })
@@ -620,13 +650,41 @@ namespace PokerProject.Services.Games
 
         public async Task RemoveGameAsync(int gameId)
         {
+            // Hent spillet inkl. Players og Rounds
             var game = await _context.Games
-                .Include(g => g.WinnerPlayer) 
+                .Include(g => g.Players)
+                .Include(g => g.Rounds)
+                    .ThenInclude(r => r.Scores)
                 .FirstOrDefaultAsync(g => g.Id == gameId);
 
             if (game == null)
                 throw new KeyNotFoundException("Game not found");
 
+            // 1️⃣ Slet HallOfFame entries for spillere i spillet
+            var playerIds = game.Players.Select(p => p.Id).ToList();
+            // 1️⃣ Sæt WinnerPlayerId = null, hvis vinderen er i spillet
+            if (game.WinnerPlayerId.HasValue && playerIds.Contains(game.WinnerPlayerId.Value))
+            {
+                game.WinnerPlayerId = null;
+                await _context.SaveChangesAsync(); // <--- Gem her før sletning
+            }
+
+            // 2️⃣ Slet HallOfFame
+            var hallOfFameEntries = await _context.HallOfFames
+                .Where(h => playerIds.Contains(h.PlayerId))
+                .ToListAsync();
+            _context.HallOfFames.RemoveRange(hallOfFameEntries);
+            await _context.SaveChangesAsync(); // valgfrit, men kan gøres
+
+            // 3️⃣ Slet Scores
+            var scoresToDelete = await _context.Scores
+                .Where(s => playerIds.Contains(s.PlayerId) ||
+                            (s.VictimPlayerId.HasValue && playerIds.Contains(s.VictimPlayerId.Value)))
+                .ToListAsync();
+            _context.Scores.RemoveRange(scoresToDelete);
+            await _context.SaveChangesAsync();
+
+            // 4️⃣ Slet selve spillet (Players og Rounds slettes via cascade)
             _context.Games.Remove(game);
             await _context.SaveChangesAsync();
         }

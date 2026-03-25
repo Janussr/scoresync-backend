@@ -13,11 +13,23 @@ namespace PokerProject.Services.Bounties
             _context = context;
         }
 
-        private async Task HandleKnockoutAsync(int gameId, int killerUserId, int victimUserId, bool isAdmin)
+        public async Task<ScoreDto> PlayerKnockoutAsync(int gameId, int killerUserId, int? victimPlayerId)
+        {
+            // Find killer's PlayerId i game
+            var killer = await _context.Players
+                .FirstOrDefaultAsync(p => p.GameId == gameId && p.UserId == killerUserId);
+
+            if (killer == null)
+                throw new InvalidOperationException("You are not a player in this game");
+
+            // Nu kalder vi eksisterende HandleKnockoutAsync med PlayerId'er
+            return await HandleKnockoutAsync(gameId, killer.Id, victimPlayerId);
+        }
+
+        public async Task<ScoreDto> HandleKnockoutAsync(int gameId, int killerPlayerId, int? victimPlayerId)
         {
             var game = await _context.Games
                 .Include(g => g.Rounds)
-                    .ThenInclude(r => r.Scores)
                 .Include(g => g.Players)
                 .FirstOrDefaultAsync(g => g.Id == gameId);
 
@@ -27,54 +39,53 @@ namespace PokerProject.Services.Bounties
             if (!game.BountyValue.HasValue)
                 throw new InvalidOperationException("Bounty value not set for this game");
 
-            // Find aktiv runde
             var currentRound = game.Rounds.FirstOrDefault(r => r.EndedAt == null);
             if (currentRound == null)
-                throw new InvalidOperationException("No active round found. Start a round before registering bounties.");
+                throw new InvalidOperationException("No active round found");
 
-            var players = game.Players
-                .Where(p => p.UserId == killerUserId || p.UserId == victimUserId)
-                .ToList();
+            // Find spillerne via PlayerId
+            var killer = game.Players.FirstOrDefault(p => p.Id == killerPlayerId);
+            var victim = game.Players.FirstOrDefault(p => p.Id == victimPlayerId);
 
-            if (!players.Any(p => p.UserId == killerUserId))
-                throw new InvalidOperationException("Killer not found in game");
-
-            if (!players.Any(p => p.UserId == victimUserId))
-                throw new InvalidOperationException("Victim not found in game");
-
-            var killer = players.First(p => p.UserId == killerUserId);
-            var victim = players.First(p => p.UserId == victimUserId);
-
-            if (killer.UserId == victim.UserId)
-                throw new InvalidOperationException("Cannot knock yourself out");
+            if (killer == null) throw new InvalidOperationException("Killer not found in game");
+            if (victim == null) throw new InvalidOperationException("Victim not found in game");
+            if (killer.Id == victim.Id) throw new InvalidOperationException("Cannot knock yourself out");
 
             var bountyValue = game.BountyValue.Value;
-            var points = victim.ActiveBounties > 0
-                ? victim.ActiveBounties * bountyValue
-                : 0;
+            var points = victim.ActiveBounties > 0 ? victim.ActiveBounties * bountyValue : 0;
 
             var score = new Score
             {
                 RoundId = currentRound.Id,
-                PlayerId = killerUserId,
+                PlayerId = killer.Id,
+                VictimPlayerId = victim.Id,
                 Value = points,
                 Type = Score.ScoreType.Bounty,
-                VictimPlayerId = victimUserId,
                 CreatedAt = DateTime.UtcNow
             };
 
-            currentRound.Scores.Add(score);
+            _context.Scores.Add(score);
 
             victim.ActiveBounties = 0;
             killer.ActiveBounties += 1;
 
             await _context.SaveChangesAsync();
+
+            return new ScoreDto
+            {
+                PlayerId = killer.Id,
+                UserId = killer.UserId,
+                Points = score.Value,
+                Type = score.Type,
+                Rounds = new RoundDto
+                {
+                    Id = currentRound.Id,
+                    RoundNumber = currentRound.RoundNumber,
+                    StartedAt = currentRound.StartedAt
+                }
+            };
         }
 
-        public async Task RegisterKnockoutAsync(int gameId, int killerUserId, int victimUserId, bool isAdmin)
-        {
-            await HandleKnockoutAsync(gameId, killerUserId, victimUserId, isAdmin);
-        }
 
 
         public async Task<List<BountyLeaderboardDto>> GetBountyLeaderboardAsync()

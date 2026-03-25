@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using PokerProject.DTOs;
 using PokerProject.Services.Bounties;
 using PokerProject.Services.Games;
@@ -15,66 +16,51 @@ namespace PokerProject.Controllers
             _bountyService = bountyService;
         }
 
-        [Authorize]
-        [HttpPost("{gameId}/bounty")]
-        public async Task<IActionResult> RegisterKnockout(int gameId, [FromBody] KnockoutDto dto)
+        // Player knockout
+        [Authorize(Roles = "User, Gamemaster, Admin")]
+        [HttpPost("player/knockout")]
+        public async Task<IActionResult> KnockoutPlayer([FromBody] KnockoutDto request)
         {
+            if (!request.VictimPlayerId.HasValue)
+                return BadRequest("VictimPlayerId is required");
+
             try
             {
-                var userId = User.GetUserId();
-                var isAdmin = User.GetUserRole() == "Admin";
-
-                await _bountyService.RegisterKnockoutAsync(
-                    gameId,
-                    userId,
-                    dto.VictimUserId,
-                    isAdmin
+                var result = await _bountyService.PlayerKnockoutAsync(
+                    request.GameId,
+                    User.GetUserId(),        // sender kun UserId
+                    request.VictimPlayerId
                 );
 
-                return Ok();
-            }
-            catch (KeyNotFoundException ex)
-            {
-                return NotFound(ex.Message);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(ex.Message);
+                return Ok(result);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, ex);
+                return BadRequest(ex.Message);
             }
         }
 
-        [Authorize(Roles = "Admin, , Gamemaster")]
-        [HttpPost("{gameId}/admin/bounty")]
-        public async Task<IActionResult> AdminRegisterKnockout(int gameId, [FromBody] KnockoutDto dto)
+        // Admin knockout
+        [Authorize(Roles = "Admin, Gamemaster")]
+        [HttpPost("admin/knockout")]
+        public async Task<IActionResult> KnockoutAdmin([FromBody] KnockoutAdminDto request)
         {
+            if (!request.KillerPlayerId.HasValue || !request.VictimPlayerId.HasValue)
+                return BadRequest("Both killerPlayerId and victimPlayerId are required");
+
             try
             {
-                var isAdmin = User.GetUserRole() == "Admin";
-
-                await _bountyService.RegisterKnockoutAsync(
-                    gameId,
-                    dto.KillerUserId,
-                    dto.VictimUserId,
-                    isAdmin
+                var result = await _bountyService.HandleKnockoutAsync(
+                    request.GameId,
+                    request.KillerPlayerId.Value,
+                    request.VictimPlayerId.Value
                 );
 
-                return Ok();
-            }
-            catch (KeyNotFoundException ex)
-            {
-                return NotFound(ex.Message);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(ex.Message);
+                return Ok(result);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, ex);
+                return BadRequest(ex.Message);
             }
         }
 

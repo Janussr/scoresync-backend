@@ -4,7 +4,8 @@ namespace PokerProject.Services.Bounties
 {
     public interface IBountyService
     {
-        Task RegisterKnockoutAsync(int gameId, int killerUserId, int victimUserId, bool isAdmin);
+        Task<ScoreDto> HandleKnockoutAsync(int gameId, int killerPlayerId, int? victimPlayerId);
+        Task<ScoreDto> PlayerKnockoutAsync(int gameId, int killerUserId, int? victimPlayerId);
         Task<List<BountyLeaderboardDto>> GetBountyLeaderboardAsync();
     }
 }

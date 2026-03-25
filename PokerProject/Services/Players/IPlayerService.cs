@@ -9,6 +9,7 @@ namespace PokerProject.Services.Players
         Task<List<PlayerDto>> GetPlayersAsync(int gameId);
         //TODO måske remove dne nedenunder, find ud af hvad pointen er.
         //Task<bool> IsUserAPlayerAsync(int gameId, int userId);
-        Task<List<PlayerDto>> RemovePlayerAsync(int gameId, int playerId);
+        Task LeaveGameAsPlayerAsync(int gameId, int userId);
+        Task RemovePlayerAsAdminAsync(int gameId, int playerId);
     }
 }

@@ -53,20 +53,38 @@ namespace PokerProject.Controllers
             }
         }
 
-        [HttpDelete("{gameId}/player/{playerId}")]
-        [Authorize(Roles = "Admin, Gamemaster")]
-        public async Task<IActionResult> RemovePlayer(int gameId, int playerId)
+
+        [HttpPost("{gameId}/leave")]
+        [Authorize]
+        public async Task<IActionResult> LeaveGame(int gameId)
         {
             try
             {
-                var updatedPlayers = await _playerService.RemovePlayerAsync(gameId, playerId);
-                return Ok(updatedPlayers);
+                var userId = User.GetUserId();
+
+                await _playerService.LeaveGameAsPlayerAsync(gameId, userId);
+
+                return Ok(new { message = "You left the game" });
             }
             catch (InvalidOperationException ex)
             {
                 return BadRequest(new { message = ex.Message });
             }
+        }
 
+        [HttpPost("{gameId}/player/{playerId}/kick")]
+        [Authorize(Roles = "Admin, Gamemaster")]
+        public async Task<IActionResult> KickPlayer(int gameId, int playerId)
+        {
+            try
+            {
+                await _playerService.RemovePlayerAsAdminAsync(gameId, playerId);
+                return Ok();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
     }

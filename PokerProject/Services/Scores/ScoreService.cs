@@ -161,10 +161,18 @@ namespace PokerProject.Services.Scores
 
         public async Task<PlayerScoreDetailsDto> GetPlayerScoreEntries(int gameId, int userId)
         {
+            var player = await _context.Players
+                .Include(p => p.User)
+                .FirstOrDefaultAsync(p => p.GameId == gameId && p.UserId == userId);
+
+            if (player == null)
+                throw new KeyNotFoundException("Player not found in this game");
+
             var scores = await _context.Scores
                 .Include(s => s.VictimPlayer)
+                    .ThenInclude(v => v.User)
                 .Include(s => s.Round)
-                .Where(s => s.Round.GameId == gameId && s.PlayerId == userId)
+                .Where(s => s.Round.GameId == gameId && s.PlayerId == player.Id)
                 .OrderBy(s => s.CreatedAt)
                 .Select(s => new ScoreEntryDto
                 {
@@ -172,7 +180,7 @@ namespace PokerProject.Services.Scores
                     Points = s.Value,
                     CreatedAt = s.CreatedAt,
                     Type = s.Type,
-                    VictimUserId = s.VictimPlayerId,
+                    VictimUserId = s.VictimPlayerId != null ? s.VictimPlayer.UserId : null,
                     VictimUserName = s.VictimPlayerId != null ? s.VictimPlayer.User.Username : null
                 })
                 .ToListAsync();
@@ -180,17 +188,15 @@ namespace PokerProject.Services.Scores
             if (!scores.Any())
                 throw new KeyNotFoundException("No scores found for this player in this game");
 
-            var user = await _context.Users.FindAsync(userId);
-
             return new PlayerScoreDetailsDto
             {
                 UserId = userId,
-                UserName = user!.Username,
+                PlayerId = player.Id,
+                UserName = player.User.Username,
                 TotalPoints = scores.Sum(s => s.Points),
                 Entries = scores
             };
         }
-
         public async Task<ScoreDto> RemoveScoreAsync(int scoreId)
         {
             var score = await _context.Scores

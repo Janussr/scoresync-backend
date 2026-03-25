@@ -25,23 +25,32 @@ namespace PokerProject.Services.Players
 
             foreach (var userId in userIds)
             {
-                var exists = await _context.Players
-                    .AnyAsync(p => p.GameId == gameId && p.UserId == userId);
+                var existingPlayer = await _context.Players
+                    .FirstOrDefaultAsync(p => p.GameId == gameId && p.UserId == userId);
 
-                if (!exists)
+                if (existingPlayer != null)
                 {
-                    var player = new Player
+                    if (!existingPlayer.IsActive)
                     {
-                        GameId = gameId,
-                        UserId = userId
-                    };
+                        existingPlayer.IsActive = true;
+                        players.Add(existingPlayer);
+                    }
 
-                    _context.Players.Add(player);
-                    players.Add(player);
+                    continue;
                 }
+
+                var player = new Player
+                {
+                    GameId = gameId,
+                    UserId = userId,
+                    IsActive = true,
+                };
+
+                _context.Players.Add(player);
+                players.Add(player);
             }
 
-            await _context.SaveChangesAsync(); 
+            await _context.SaveChangesAsync();
 
             var result = new List<PlayerDto>();
 
@@ -51,7 +60,7 @@ namespace PokerProject.Services.Players
 
                 result.Add(new PlayerDto
                 {
-                    PlayerId = player.Id, 
+                    PlayerId = player.Id,
                     UserId = player.UserId,
                     Username = user?.Username ?? "Unknown",
                     RebuyCount = 0,
@@ -82,38 +91,47 @@ namespace PokerProject.Services.Players
                 .AnyAsync(gp => gp.GameId == gameId && gp.UserId == userId);
         }
 
-        public async Task<List<PlayerDto>> RemovePlayerAsync(int gameId, int playerId)
-        {
-            var game = await _context.Games
-                .Include(g => g.Players)
-                .FirstOrDefaultAsync(g => g.Id == gameId);
 
-            if (game == null)
-                throw new KeyNotFoundException("Game not found");
+        public async Task LeaveGameAsPlayerAsync(int gameId, int userId)
+        {
+            var game = await _context.Games.FindAsync(gameId);
 
             if (game.IsFinished)
-                throw new InvalidOperationException("Cannot remove players from a finished game");
+                throw new Exception("Game already finished");
 
             var player = await _context.Players
-                .FirstOrDefaultAsync(p => p.GameId == gameId && p.Id == playerId);
+                .FirstOrDefaultAsync(p => p.GameId == gameId && p.UserId == userId);
 
             if (player == null)
-                throw new InvalidOperationException("User is not a player in this game");
+                throw new Exception("Player not found");
 
-            _context.Players.Remove(player);
+            if (!player.IsActive)
+                return;
+
+            player.IsActive = false;
+            player.LeftAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task RemovePlayerAsAdminAsync(int gameId, int playerId)
+        {
+            var player = await _context.Players
+        .FirstOrDefaultAsync(p => p.GameId == gameId && p.Id == playerId);
+
+            if (player == null)
+                throw new Exception("Player not found");
+
+            if (!player.IsActive)
+                return;
+
+            player.IsActive = false;
+            player.LeftAt = DateTime.UtcNow;
+
             await _context.SaveChangesAsync();
 
-            return await _context.Players
-                .Where(p => p.GameId == gameId)
-                .Include(p => p.User)
-                .Select(p => new PlayerDto
-                {
-                    PlayerId = p.Id,
-                    UserId = p.UserId,
-                    Username = p.User.Username
-                })
-                .ToListAsync();
         }
+
 
     }
 }

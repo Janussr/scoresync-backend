@@ -112,20 +112,25 @@ namespace PokerProject.Data
                 .HasForeignKey(s => s.VictimPlayerId)
                 .OnDelete(DeleteBehavior.NoAction);
 
-            // =========================
-            // HALL OF FAME
-            // =========================
+             //=========================
+             //HALL OF FAME
+             //=========================
             modelBuilder.Entity<HallOfFame>()
                 .HasOne(h => h.Game)
                 .WithOne()
                 .HasForeignKey<HallOfFame>(h => h.GameId)
-                .OnDelete(DeleteBehavior.Cascade); // slet HoF hvis game slettes
+                .OnDelete(DeleteBehavior.Cascade); 
 
             modelBuilder.Entity<HallOfFame>()
                 .HasOne(h => h.Player)
                 .WithMany()
                 .HasForeignKey(h => h.PlayerId)
-                .OnDelete(DeleteBehavior.Restrict); // slet ikke HoF entries hvis player slettes
+                .OnDelete(DeleteBehavior.Restrict); 
+
+            modelBuilder.Entity<HallOfFame>()
+            .Ignore("UserId");
+
+
 
             base.OnModelCreating(modelBuilder);
         }
