@@ -36,44 +36,5 @@ namespace PokerProject.Controllers
                 return StatusCode(500, new { message = "Something went wrong", detail = ex.Message });
             }
         }
-
-        [HttpGet("{gameId}/current")]
-        public async Task<IActionResult> GetCurrentRound(int gameId)
-        {
-            try
-            {
-                var round = await _roundService.GetCurrentRoundAsync(gameId);
-                if (round == null)
-                    return NotFound(new { message = "No active round found for this game" });
-
-                return Ok(round);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Something went wrong", detail = ex.Message });
-            }
-        }
-
-        [HttpPost("{roundId}/end")]
-        public async Task<IActionResult> EndRound(int roundId)
-        {
-            try
-            {
-                var round = await _roundService.EndRoundAsync(roundId);
-                return Ok(round);
-            }
-            catch (KeyNotFoundException ex)
-            {
-                return NotFound(new { message = ex.Message });
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Something went wrong", detail = ex.Message });
-            }
-        }
     }
 }

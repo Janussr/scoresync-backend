@@ -55,13 +55,6 @@ namespace PokerProject.Services.Rounds
                     .Except(playersWithScore)
                     .ToList();
 
-                //if (missingPlayers.Any())
-                //{
-                //    throw new InvalidOperationException(
-                //        $"Missing scores from users: {string.Join(",", missingPlayers)}"
-                //    );
-                //}
-
                 // End round
                 currentRound.EndedAt = DateTime.UtcNow;
             }
@@ -112,55 +105,7 @@ namespace PokerProject.Services.Rounds
             };
         }
 
-        public async Task<RoundDto?> GetCurrentRoundAsync(int gameId)
-        {
-            var round = await _context.Rounds
-                .FirstOrDefaultAsync(r => r.GameId == gameId && r.EndedAt == null);
+        
 
-            if (round == null) return null;
-
-            return new RoundDto
-            {
-                Id = round.Id,
-                RoundNumber = round.RoundNumber,
-                StartedAt = round.StartedAt
-            };
-        }
-
-        public async Task<RoundDto> EndRoundAsync(int roundId)
-        {
-            var round = await _context.Rounds
-                .Include(r => r.Game)
-                .FirstOrDefaultAsync(r => r.Id == roundId);
-
-            if (round == null) throw new KeyNotFoundException("Round not found");
-
-            if (round.Game.IsFinished)
-                throw new InvalidOperationException("Cannot end round of finished game");
-
-            if (round.EndedAt != null) throw new InvalidOperationException("Round already ended");
-
-            round.EndedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-
-            //SIGNALR
-            await _hubContext.Clients.Group($"Game-{round.GameId}")
-            .SendAsync("RoundEnded", new RoundDto
-            {
-                Id = round.Id,
-                RoundNumber = round.RoundNumber,
-                StartedAt = round.StartedAt,
-                EndedAt = round.EndedAt
-            });
-
-            return new RoundDto
-            {
-                Id = round.Id,
-                RoundNumber = round.RoundNumber,
-                StartedAt = round.StartedAt,
-                EndedAt = round.EndedAt
-            };
-
-        }
     }
 }
