@@ -54,6 +54,7 @@ namespace PokerProject.Services.Rounds
             _context.Rounds.Add(newRound);
             await _context.SaveChangesAsync();
 
+
             // Send RoundEnded event til klienter, hvis en runde blev afsluttet
             if (currentRound != null)
             {
@@ -71,8 +72,6 @@ namespace PokerProject.Services.Rounds
                     }).ToList()
                 };
 
-                await _hubContext.Clients.Group($"Game-{gameId}")
-                    .SendAsync("RoundEnded", endedDto);
             }
 
             // Send RoundStarted til klienter
@@ -84,8 +83,12 @@ namespace PokerProject.Services.Rounds
                 Scores = new List<ScoreDto>()
             };
 
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
             await _hubContext.Clients.Group($"Game-{gameId}")
                 .SendAsync("RoundStarted", newDto);
+
 
             return newDto;
 
