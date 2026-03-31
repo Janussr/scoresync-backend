@@ -31,7 +31,7 @@ public class UsersController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { message = ex });
+            return StatusCode(500, new { message = ex.Message });
         }
     }
 
