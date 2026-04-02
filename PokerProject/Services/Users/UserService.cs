@@ -52,6 +52,8 @@ namespace PokerProject.Services.Users
 
         public async Task<UserDto> RegisterAsync(RegisterUserDto dto)
         {
+            var normalizedUsername = NormalizeUsername(dto.Username);
+
             var existingUser = await _context.Users
                 .FirstOrDefaultAsync(u => u.Username == dto.Username);
 
@@ -60,7 +62,7 @@ namespace PokerProject.Services.Users
 
             var user = new User
             {
-                Username = dto.Username,
+                Username = normalizedUsername,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
                 Role = dto.Role
             };
@@ -73,6 +75,14 @@ namespace PokerProject.Services.Users
                 Id = user.Id,
                 Username = user.Username,
             };
+        }
+
+        private static string NormalizeUsername(string username)
+        {
+            if (string.IsNullOrWhiteSpace(username))
+                return username;
+
+            return char.ToUpper(username[0]) + username.Substring(1);
         }
 
         public async Task<User?> ValidateUserAsync(string username, string password)
