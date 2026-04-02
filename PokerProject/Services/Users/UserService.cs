@@ -54,7 +54,7 @@ namespace PokerProject.Services.Users
             var normalizedUsername = NormalizeUsername(dto.Username);
 
             var existingUser = await _context.Users
-                .FirstOrDefaultAsync(u => u.Username == dto.Username);
+             .FirstOrDefaultAsync(u => u.Username.ToLower() == normalizedUsername.ToLower());
 
             if (existingUser != null)
                 throw new Exception("Username already exists");
