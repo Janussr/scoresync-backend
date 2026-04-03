@@ -162,6 +162,7 @@ namespace PokerProject.Services.Scores
         public async Task<PlayerScoreDetailsDto> GetPlayerScoreEntries(int gameId, int playerId)
         {
             var player = await _context.Players
+                .AsNoTracking()
                 .Include(p => p.User)
                 .FirstOrDefaultAsync(p => p.GameId == gameId && p.Id == playerId);
 

@@ -75,6 +75,7 @@ namespace PokerProject.Services.Players
         public async Task<List<PlayerDto>> GetPlayersAsync(int gameId)
         {
             return await _context.Players
+                .AsNoTracking()
                 .Where(gp => gp.GameId == gameId)
                 .Include(gp => gp.User)
                 .Select(gp => new PlayerDto
@@ -88,6 +89,7 @@ namespace PokerProject.Services.Players
         public async Task<bool> IsUserAPlayerAsync(int gameId, int userId)
         {
             return await _context.Players
+                .AsNoTracking()
                 .AnyAsync(gp => gp.GameId == gameId && gp.UserId == userId);
         }
 

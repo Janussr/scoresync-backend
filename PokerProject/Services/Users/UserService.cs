@@ -18,6 +18,7 @@ namespace PokerProject.Services.Users
         public async Task<int?> GetActiveGameIdByUserAsync(int userId)
         {
             var activeGameId = await _context.Players
+                .AsNoTracking()
                 .Include(p => p.Game)
                 .Where(p => p.UserId == userId && p.IsActive && !p.Game.IsFinished)
                 .Select(p => (int?)p.GameId)
@@ -28,7 +29,9 @@ namespace PokerProject.Services.Users
 
         public async Task<IEnumerable<UserDto>> GetAllUsersAsync()
         {
-            return await _context.Users.Select(u => new UserDto {
+            return await _context.Users
+                .AsNoTracking()
+                .Select(u => new UserDto {
                     Id = u.Id,
                     Username = u.Username,
                 }).ToListAsync();

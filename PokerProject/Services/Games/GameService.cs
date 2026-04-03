@@ -317,6 +317,7 @@ namespace PokerProject.Services.Games
         public async Task<List<GamePanelDto>> GetAllActiveGamesForGamePanelAsync(int userId)
         {
             var games = await _context.Games
+                .AsNoTracking()
                 .Where(g => !g.IsFinished && g.GamemasterId == userId)
                 .Include(g => g.Players)
                     .ThenInclude(p => p.User)
@@ -369,6 +370,7 @@ namespace PokerProject.Services.Games
         public async Task<GameDetailsDto?> GetActiveGameForPlayerAsync(int userId)
         {
             var game = await _context.Games
+                .AsNoTracking()
                 .Include(g => g.Rounds)
                     .ThenInclude(r => r.Scores)
                         .ThenInclude(s => s.Player)
@@ -459,6 +461,7 @@ namespace PokerProject.Services.Games
         public async Task<List<GameDto>> GetActiveGamesAsync()
         {
             return await _context.Games
+                .AsNoTracking()
                 .Where(g => !g.IsFinished)
 
                 .Include(g => g.Players)
@@ -535,6 +538,7 @@ namespace PokerProject.Services.Games
         public async Task<List<GameDto>> GetAllGamesAsync()
         {
             var games = await _context.Games
+                .AsNoTracking()
                 .Select(g => new GameDto
                 {
                     Id = g.Id,
@@ -626,6 +630,7 @@ namespace PokerProject.Services.Games
         public async Task<GameDetailsDto?> GetGameDetailsAsync(int gameId, string? role)
         {
             var game = await _context.Games
+                .AsNoTracking()
                 .Include(g => g.Rounds)
                     .ThenInclude(r => r.Scores)
                         .ThenInclude(s => s.Player)

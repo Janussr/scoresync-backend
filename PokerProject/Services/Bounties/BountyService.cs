@@ -124,6 +124,7 @@ namespace PokerProject.Services.Bounties
                 .ToList();
 
             var users = await _context.Users
+                .AsNoTracking()
                 .Where(u => allUserIds.Contains(u.Id))
                 .ToListAsync();
 

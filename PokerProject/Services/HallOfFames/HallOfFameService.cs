@@ -16,6 +16,7 @@ namespace PokerProject.Services.HallOfFames
         public async Task<List<HallOfFameDto>> GetEntireHallOfFameAsync()
         {
             return await _context.HallOfFames
+                .AsNoTracking()
                 .GroupBy(h => new
                 {
                     h.Player.UserId,
