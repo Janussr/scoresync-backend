@@ -109,6 +109,20 @@ namespace PokerProject.Controllers
             }
         }
 
+        [HttpGet("history-page")]
+        public async Task<ActionResult<List<GameHistoryListItemDto>>> GetGameHistory()
+        {
+            try
+            {
+                var games = await _gameService.GetGameHistoryAsync();
+                return Ok(games);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex);
+            }
+        }
+
         [HttpGet("player-page/active")]
         public async Task<ActionResult<GameDto>> GetActiveGameForPlayer()
         {

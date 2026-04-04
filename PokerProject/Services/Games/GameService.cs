@@ -601,6 +601,25 @@ namespace PokerProject.Services.Games
             return games;
         }
 
+        public async Task<List<GameHistoryListItemDto>> GetGameHistoryAsync()
+        {
+            return await _context.Games
+                .AsNoTracking()
+                .Where(g => g.IsFinished)
+                .OrderByDescending(g => g.GameNumber)
+                .Select(g => new GameHistoryListItemDto
+                {
+                    Id = g.Id,
+                    GameNumber = g.GameNumber,
+                    Type = g.Type,
+                    Date = g.EndedAt,
+                    WinnerName = g.WinnerPlayer != null ? g.WinnerPlayer.User.Username : "",
+                    PlayerCount = g.Players.Count(),
+                    RoundCount = g.Rounds.Count()
+                })
+                .ToListAsync();
+        }
+
         public async Task<GameDto?> GetGameByIdAsync(int id)
         {
             var game = await _context.Games
