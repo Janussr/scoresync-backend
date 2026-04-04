@@ -316,145 +316,126 @@ namespace PokerProject.Services.Games
 
         public async Task<List<GamePanelDto>> GetAllActiveGamesForGamePanelAsync(int userId)
         {
-            var games = await _context.Games
+            return await _context.Games
                 .AsNoTracking()
                 .Where(g => !g.IsFinished && g.GamemasterId == userId)
-                .Include(g => g.Players)
-                    .ThenInclude(p => p.User)
-                .Include(g => g.Rounds)
-                    .ThenInclude(r => r.Scores)
-                        .ThenInclude(s => s.Player)
-                            .ThenInclude(p => p.User)
                 .OrderByDescending(g => g.StartedAt)
-                .ToListAsync();
-
-            return games.Select(game => new GamePanelDto
-            {
-                Id = game.Id,
-                GameNumber = game.GameNumber,
-                StartedAt = game.StartedAt,
-                IsFinished = game.IsFinished,
-                IsOpenForPlayers = game.IsOpenForPlayers,
-                Type = game.Type,
-                RebuyValue = game.RebuyValue,
-                BountyValue = game.BountyValue,
-                Players = game.Players.Select(p => new PlayerDto
+                .Select(game => new GamePanelDto
                 {
-                    PlayerId = p.Id,
-                    UserId = p.UserId,
-                    Username = p.User.Username,
-                    RebuyCount = p.RebuyCount,
-                    ActiveBounties = p.ActiveBounties,
-                    IsActive = p.IsActive
-                }).ToList(),
-                Rounds = game.Rounds
-                    .OrderBy(r => r.RoundNumber)
-                    .Select(r => new RoundDto
-                    {
-                        Id = r.Id,
-                        RoundNumber = r.RoundNumber,
-                        StartedAt = r.StartedAt,
-                        EndedAt = r.EndedAt,
-                        Scores = r.Scores.Select(s => new ScoreDto
+                    Id = game.Id,
+                    GameNumber = game.GameNumber,
+                    StartedAt = game.StartedAt,
+                    IsFinished = game.IsFinished,
+                    IsOpenForPlayers = game.IsOpenForPlayers,
+                    Type = game.Type,
+                    RebuyValue = game.RebuyValue,
+                    BountyValue = game.BountyValue,
+
+                    Players = game.Players
+                        .OrderBy(p => p.Id)
+                        .Select(p => new PlayerDto
                         {
-                            Id = s.Id,
-                            PlayerId = s.PlayerId,
-                            UserName = s.Player.User.Username,
-                            Points = s.Value,
-                            Type = s.Type
-                        }).ToList()
-                    }).ToList()
-            }).ToList();
+                            PlayerId = p.Id,
+                            UserId = p.UserId,
+                            Username = p.User.Username,
+                            RebuyCount = p.RebuyCount,
+                            ActiveBounties = p.ActiveBounties,
+                            IsActive = p.IsActive
+                        })
+                        .ToList(),
+
+                    Rounds = game.Rounds
+                        .OrderBy(r => r.RoundNumber)
+                        .Select(r => new RoundDto
+                        {
+                            Id = r.Id,
+                            RoundNumber = r.RoundNumber,
+                            StartedAt = r.StartedAt,
+                            EndedAt = r.EndedAt,
+                            Scores = r.Scores
+                                .OrderBy(s => s.Id)
+                                .Select(s => new ScoreDto
+                                {
+                                    Id = s.Id,
+                                    PlayerId = s.PlayerId,
+                                    UserId = s.Player.UserId,
+                                    UserName = s.Player.User.Username,
+                                    Points = s.Value,
+                                    GameId = r.GameId,
+                                    Type = s.Type,
+                                    Rounds = null
+                                })
+                                .ToList()
+                        })
+                        .ToList()
+                })
+                .ToListAsync();
         }
 
-        public async Task<GameDetailsDto?> GetActiveGameForPlayerAsync(int userId)
+        public async Task<ActiveGamePlayerPageDto?> GetActiveGameForPlayerAsync(int userId)
         {
             var game = await _context.Games
                 .AsNoTracking()
-                .Include(g => g.Rounds)
-                    .ThenInclude(r => r.Scores)
-                        .ThenInclude(s => s.Player)
-                            .ThenInclude(p => p.User)
-                .Include(g => g.WinnerPlayer)
-                    .ThenInclude(w => w.User)
-                .Include(g => g.Players)
-                    .ThenInclude(p => p.User)
                 .Where(g => !g.IsFinished && g.Players.Any(p => p.UserId == userId && p.IsActive))
+                .Select(g => new ActiveGamePlayerPageDto
+                {
+                    Id = g.Id,
+                    GameNumber = g.GameNumber,
+                    StartedAt = g.StartedAt,
+                    EndedAt = g.EndedAt,
+                    IsFinished = g.IsFinished,
+                    Type = g.Type,
+                    RebuyValue = g.RebuyValue,
+                    BountyValue = g.BountyValue,
+
+                    Me = g.Players
+                        .Where(p => p.UserId == userId)
+                        .Select(p => new PlayerDto
+                        {
+                            PlayerId = p.Id,
+                            UserId = p.UserId,
+                            Username = p.User.Username,
+                            RebuyCount = p.RebuyCount,
+                            ActiveBounties = p.ActiveBounties
+                        })
+                        .First(),
+
+                    KnockoutTargets = g.Players
+                        .Where(p => p.UserId != userId && p.IsActive)
+                        .OrderBy(p => p.User.Username)
+                        .Select(p => new KnockoutTargetDto
+                        {
+                            PlayerId = p.Id,
+                            Username = p.User.Username,
+                            ActiveBounties = p.ActiveBounties
+                        })
+                        .ToList(),
+
+                    Rounds = g.Rounds
+                        .OrderBy(r => r.RoundNumber)
+                        .Select(r => new PlayerPageRoundDto
+                        {
+                            Id = r.Id,
+                            RoundNumber = r.RoundNumber,
+                            StartedAt = r.StartedAt,
+                            EndedAt = r.EndedAt,
+                            Scores = r.Scores
+                                .Where(s => s.Player.UserId == userId)
+                                .OrderBy(s => s.Id)
+                                .Select(s => new PlayerPageScoreEntryDto
+                                {
+                                    Id = s.Id,
+                                    PlayerId = s.PlayerId,
+                                    Points = s.Value,
+                                    Type = s.Type
+                                })
+                                .ToList()
+                        })
+                        .ToList()
+                })
                 .FirstOrDefaultAsync();
 
-            if (game == null) return null;
-
-            // --- Scores grouped per Player ---
-            var scores = game.Rounds
-                .SelectMany(r => r.Scores)
-                .GroupBy(s => new { s.PlayerId, s.Player.User.Username })
-                .Select(g => new GameScoreboardDto
-                {
-                    PlayerId = g.First().PlayerId,
-                    UserName = g.Key.Username,
-                    TotalPoints = g.Sum(s => s.Value)
-                })
-                .ToList();
-
-            // --- Players ---
-            var players = game.Players.Select(p => new PlayerDto
-            {
-                PlayerId = p.Id,
-                UserId = p.UserId,
-                Username = p.User.Username,
-                RebuyCount = p.RebuyCount,
-                ActiveBounties = p.ActiveBounties,
-                IsActive = p.IsActive
-            }).ToList();
-
-            // --- Winner ---
-            WinnerDto? winnerDto = null;
-            if (game.WinnerPlayer != null)
-            {
-                var winningScore = game.Rounds
-                    .SelectMany(r => r.Scores)
-                    .Where(s => s.PlayerId == game.WinnerPlayerId)
-                    .Sum(s => s.Value);
-
-                winnerDto = new WinnerDto
-                {
-                    PlayerId = game.WinnerPlayer.Id,
-                    UserName = game.WinnerPlayer.User.Username,
-                    WinningScore = winningScore,
-                    WinDate = game.EndedAt ?? DateTimeOffset.UtcNow
-                };
-            }
-
-            return new GameDetailsDto
-            {
-                Id = game.Id,
-                GameNumber = game.GameNumber,
-                StartedAt = game.StartedAt,
-                EndedAt = game.EndedAt,
-                IsFinished = game.IsFinished,
-                RebuyValue = game.RebuyValue,       
-                BountyValue = game.BountyValue,
-                Scores = scores,
-                Players = players,
-                Type = game.Type,
-                Winner = winnerDto,
-                Rounds = game.Rounds.Select(r => new RoundDto
-                {
-                    Id = r.Id,
-                    RoundNumber = r.RoundNumber,
-                    StartedAt = r.StartedAt,
-                    EndedAt = r.EndedAt,
-                    Scores = r.Scores.Select(s => new ScoreDto
-                    {
-                        Id = s.Id,
-                        PlayerId = s.PlayerId,
-                        UserName = s.Player.User.Username,
-                        Points = s.Value,
-                        GameId = game.Id,
-                        Type = s.Type
-                    }).ToList()
-                }).ToList()
-            };
+            return game;
         }
 
 

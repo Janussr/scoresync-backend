@@ -124,7 +124,7 @@ namespace PokerProject.Controllers
         }
 
         [HttpGet("player-page/active")]
-        public async Task<ActionResult<GameDto>> GetActiveGameForPlayer()
+        public async Task<ActionResult<ActiveGamePlayerPageDto>> GetActiveGameForPlayer()
         {
             try
             {
@@ -132,6 +132,7 @@ namespace PokerProject.Controllers
 
                 var game = await _gameService.GetActiveGameForPlayerAsync(userId);
                 if (game == null) return NotFound();
+
                 return Ok(game);
             }
             catch (Exception ex)

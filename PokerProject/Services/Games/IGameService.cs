@@ -13,7 +13,7 @@ namespace PokerProject.Services.Games
         Task RemoveGameAsync(int gameId);
         Task<List<GameHistoryListItemDto>> GetGameHistoryAsync();
         Task<List<GamePanelDto>> GetAllActiveGamesForGamePanelAsync(int userId);
-        Task<GameDetailsDto?> GetActiveGameForPlayerAsync(int playerId);
+        Task<ActiveGamePlayerPageDto?> GetActiveGameForPlayerAsync(int userId);
         Task<List<GameListDto>> GetActiveGamesLobbyListAsync();
         Task<List<GameDto>> GetAllGamesAsync();
         Task<GameDetailsDto?> GetGameDetailsAsync(int gameId, string? role);
