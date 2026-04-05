@@ -4,6 +4,7 @@ using PokerProject.Data;
 using PokerProject.DTOs.Rounds;
 using PokerProject.DTOs.Scores;
 using PokerProject.Hubs;
+using PokerProject.Hubs.GameNotifier;
 using PokerProject.Models;
 
 namespace PokerProject.Services.Rounds
@@ -12,13 +13,15 @@ namespace PokerProject.Services.Rounds
     {
         private readonly PokerDbContext _context;
         private readonly IHubContext<GameHub> _hubContext;
+        private readonly IGameNotifier _gameNotifier;
         public const string RoundStarted = "RoundStarted";
         public const string RoundEnded = "RoundEnded";
 
-        public RoundService(PokerDbContext context, IHubContext<GameHub> hubContext)
+        public RoundService(PokerDbContext context, IHubContext<GameHub> hubContext, IGameNotifier gameNotifier)
         {
             _context = context;
             _hubContext = hubContext;
+            _gameNotifier = gameNotifier;
         }
 
         public async Task<RoundDto> StartNewRoundAsync(int gameId)
@@ -85,8 +88,7 @@ namespace PokerProject.Services.Rounds
             await transaction.CommitAsync();
 
             // Send RoundStarted to clients
-            await _hubContext.Clients.Group($"Game-{gameId}")
-                .SendAsync("RoundStarted", newDto);
+            await _gameNotifier.StartNewRound(gameId, newDto);
 
 
             return newDto;

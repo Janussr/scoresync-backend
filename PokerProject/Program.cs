@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using PokerProject.Data;
 using PokerProject.Hubs;
+using PokerProject.Hubs.GameNotifier;
 using PokerProject.Services.Bounties;
 using PokerProject.Services.Database;
 using PokerProject.Services.Games;
@@ -43,6 +44,7 @@ builder.Services.AddScoped<IPlayerService, PlayerService>();
 builder.Services.AddScoped<IBountyService, BountyService>();
 builder.Services.AddScoped<IRoundService, RoundService>();
 builder.Services.AddScoped<IDatabaseService, DatabaseService>();
+builder.Services.AddScoped<IGameNotifier, GameNotifier>();
 
 //CORS
 var corsOrigins = Environment.GetEnvironmentVariable("CORS_ORIGINS")?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();

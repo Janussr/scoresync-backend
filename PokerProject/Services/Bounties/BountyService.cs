@@ -3,16 +3,19 @@ using PokerProject.Data;
 using PokerProject.DTOs.Bounties;
 using PokerProject.DTOs.Rounds;
 using PokerProject.DTOs.Scores;
+using PokerProject.Hubs.GameNotifier;
 
 namespace PokerProject.Services.Bounties
 {
     public class BountyService : IBountyService
     {
         private readonly PokerDbContext _context;
+        private readonly IGameNotifier _gameNotifier;
 
-        public BountyService(PokerDbContext context)
+        public BountyService(PokerDbContext context, IGameNotifier gameNotifier)
         {
             _context = context;
+            _gameNotifier = gameNotifier;
         }
 
         public async Task<ScoreDto> PlayerKnockoutAsync(int gameId, int killerUserId, int? victimPlayerId)
@@ -69,6 +72,30 @@ namespace PokerProject.Services.Bounties
             killer.ActiveBounties += 1;
 
             await _context.SaveChangesAsync();
+
+            await _gameNotifier.KnockoutUpdated(gameId, new KnockoutUpdatedDto
+            {
+                GameId = gameId,
+                KillerPlayerId = killer.Id,
+                VictimPlayerId = victim.Id,
+                KillerActiveBounties = killer.ActiveBounties,
+                VictimActiveBounties = victim.ActiveBounties,
+                Score = new ScoreDto
+                {
+                    Id = score.Id,
+                    PlayerId = killer.Id,
+                    UserId = killer.UserId,
+                    Points = score.Value,
+                    Type = score.Type,
+                    Rounds = new RoundDto
+                    {
+                        Id = currentRound.Id,
+                        RoundNumber = currentRound.RoundNumber,
+                        StartedAt = currentRound.StartedAt,
+                        EndedAt = currentRound.EndedAt
+                    }
+                }
+            });
 
             return new ScoreDto
             {

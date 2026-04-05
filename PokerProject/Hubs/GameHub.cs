@@ -17,12 +17,4 @@ public class GameHub : Hub
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"Game-{gameId}");
     }
 
-    public async Task BroadcastRoundUpdated(int gameId, RoundDto round)
-      => await Clients.Group($"Game-{gameId}").SendAsync("RoundUpdated", round);
-
-    public async Task BroadcastRoundStarted(int gameId, RoundDto round)
-        => await Clients.Group($"Game-{gameId}").SendAsync("RoundStarted", round);
-
-
-
 }
