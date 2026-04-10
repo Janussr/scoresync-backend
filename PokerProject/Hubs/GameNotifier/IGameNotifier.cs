@@ -11,5 +11,6 @@ namespace PokerProject.Hubs.GameNotifier
         Task StartNewRound(int gameId, RoundDto newDto);
         Task KnockoutTargetsUpdated( int gameId,IEnumerable<KnockoutTargetDto> knockoutTargets);
         Task PlayerRemoved(int gameId, PlayerRemovedDto payload);
+        Task GameEnded(int gameId);
     }
 }

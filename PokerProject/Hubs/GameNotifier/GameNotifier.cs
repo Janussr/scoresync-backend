@@ -23,6 +23,12 @@ namespace PokerProject.Hubs.GameNotifier
             .SendAsync("KnockoutUpdated", payload);
 
 
+
+        public Task GameEnded(int gameId)
+            => _hubContext.Clients.Group($"Game-{gameId}")
+                .SendAsync("GameFinished", gameId);
+
+
         public Task StartNewRound(int gameId, RoundDto newDto)
             => _hubContext.Clients.Group($"Game-{gameId}")
                 .SendAsync("RoundStarted", newDto);

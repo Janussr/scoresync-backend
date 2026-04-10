@@ -273,9 +273,7 @@ namespace PokerProject.Services.Games
                 throw;
             }
 
-            await _hubContext.Clients
-                .Group($"Game-{game.Id}")
-                .SendAsync("GameFinished", game.Id);
+             await _gameNotifier.GameEnded(game.Id);
 
             return BuildFinishedGameDto(game);
         }
