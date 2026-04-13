@@ -793,6 +793,13 @@ namespace PokerProject.Services.Games
             game.BountyValue = dto.BountyValue;
 
             await _context.SaveChangesAsync();
+
+            await _gameNotifier.RulesUpdated(gameId, new RulesUpdatedDto
+            {
+                GameId = gameId,
+                RebuyValue = game.RebuyValue,
+                BountyValue = game.BountyValue
+            });
         }
 
 
