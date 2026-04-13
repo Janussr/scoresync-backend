@@ -17,5 +17,6 @@ namespace PokerProject.Hubs.GameNotifier
         Task PlayerJoined(int gameId, PlayerJoinedDto payload);
         Task PlayerLeft(int gameId, PlayerLeftDto payload);
         Task RebuyUpdated(int gameId, RebuyUpdatedDto payload);
+        Task ScoreAdded(int gameId, ScoreAddedDto payload);
     }
 }

@@ -74,13 +74,14 @@ namespace PokerProject.Services.Scores
             _context.Scores.Add(score);
             await _context.SaveChangesAsync();
 
-            return new ScoreDto
+            var scoreDto = new ScoreDto
             {
                 Id = score.Id,
                 PlayerId = targetPlayer.Id,
                 UserId = targetPlayer.UserId,
                 UserName = targetPlayer.User.Username,
                 Points = score.Value,
+                GameId = gameId,
                 Type = score.Type,
                 Rounds = new RoundDto
                 {
@@ -89,6 +90,14 @@ namespace PokerProject.Services.Scores
                     StartedAt = round.StartedAt
                 }
             };
+
+            await _gameNotifier.ScoreAdded(gameId, new ScoreAddedDto
+            {
+                GameId = gameId,
+                Score = scoreDto
+            });
+
+            return scoreDto;
         }
 
 

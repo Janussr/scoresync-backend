@@ -66,5 +66,9 @@ namespace PokerProject.Hubs.GameNotifier
             => _hubContext.Clients.Group($"Game-{gameId}")
                 .SendAsync("RebuyUpdated", payload);
 
+        public Task ScoreAdded(int gameId, ScoreAddedDto payload)
+            => _hubContext.Clients.Group($"Game-{gameId}")
+                .SendAsync("ScoreAdded", payload);
+
     }
 }
