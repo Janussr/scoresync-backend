@@ -96,7 +96,7 @@ namespace PokerProject.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<List<GameDto>>> GetAllGames()
+        public async Task<ActionResult<List<GameListItemDto>>> GetAllGames()
         {
             try
             {
