@@ -13,6 +13,7 @@ using PokerProject.Services.Rounds;
 using PokerProject.Services.Scores;
 using PokerProject.Services.Users;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,12 +26,12 @@ builder.Services.AddOpenApi();
 
 // DATABASE 
 //INCOMMENT FOR LOCAL DB
-//builder.Services.AddDbContext<PokerDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddDbContext<PokerDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 //INCOMMENT FOR PROD DB
 //Connection string for online database, loaded from env variable
-var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING");
-builder.Services.AddDbContext<PokerDbContext>(options => options.UseSqlServer(connectionString));
+//var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING");
+//builder.Services.AddDbContext<PokerDbContext>(options => options.UseSqlServer(connectionString));
 
 //Dependency Injection for services
 builder.Services.AddScoped<IUserService, UserService>();
@@ -123,6 +124,23 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.KnownProxies.Clear();
 });
 
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy("login", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -138,6 +156,8 @@ app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseRateLimiter();
 
 app.MapHub<GameHub>("gamehub");
 

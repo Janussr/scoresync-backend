@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using PokerProject.DTOs.Admin;
 using PokerProject.DTOs.Auth;
 using PokerProject.DTOs.Games;
@@ -82,6 +83,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpPost("login")]
+    [EnableRateLimiting("login")]
     public async Task<IActionResult> Login(LoginUserDto dto)
     {
         var user = await _userService.ValidateUserAsync(dto.Username, dto.Password);
